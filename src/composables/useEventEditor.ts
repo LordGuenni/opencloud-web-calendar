@@ -1,7 +1,7 @@
 import { ref, readonly, computed } from 'vue'
 import { getCalDAVClient, ConflictError } from '../caldav/client'
 import { parseRRuleToFormData } from '../caldav/ics-utils'
-import type { CalendarEvent, EventFormData, RecurrenceFormData } from '../types/calendar'
+import type { CalendarEvent, EventFormData } from '../types/calendar'
 
 export type EditScope = 'single' | 'series'
 

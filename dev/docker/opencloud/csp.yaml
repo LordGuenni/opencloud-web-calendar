@@ -9,6 +9,7 @@ directives:
     - 'https://raw.githubusercontent.com/opencloud-eu/awesome-apps/'
     - 'https://${IDP_DOMAIN|keycloak.opencloud.test}${TRAEFIK_PORT_HTTPS}/'
     - 'https://update.opencloud.eu/'
+    - 'https://nominatim.openstreetmap.org/'
   default-src:
     - '''none'''
   font-src:

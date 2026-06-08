@@ -5,6 +5,7 @@ import type { Calendar, RecurrenceFormData } from '../types/calendar'
 import { formatDateForInput, formatTimeForInput } from '../utils/date'
 import { t } from '../composables/useLanguage'
 import { generateICS } from '../caldav/ics-utils'
+import { useLocationSearch } from '../composables/useLocationSearch'
 
 const props = defineProps<{
   calendars: readonly Calendar[]
@@ -33,6 +34,30 @@ const {
   resolveConflictKeepLocal,
   resolveConflictUseServer
 } = useEventEditor()
+
+const {
+  results: locationResults,
+  loading: searchingLocation,
+  search: searchLocation,
+  clearResults: clearLocationResults
+} = useLocationSearch()
+
+function handleLocationInput(e: Event) {
+  const query = (e.target as HTMLInputElement).value
+  searchLocation(query)
+}
+
+function selectLocation(displayName: string) {
+  formData.value.location = displayName
+  clearLocationResults()
+}
+
+function handleLocationBlur() {
+  // Delay clearing results to allow click event on dropdown to fire
+  setTimeout(() => {
+    clearLocationResults()
+  }, 200)
+}
 
 const WEEKDAYS = [
   { value: 'MO', label: 'Mon' },
@@ -534,17 +559,43 @@ function handleExport() {
           </div>
 
           <!-- Location -->
-          <div>
+          <div class="ext:relative">
             <label for="event-location" class="ext:block ext:text-sm ext:font-medium ext:text-gray-700 ext:mb-1">
               {{ t('Location') }}
             </label>
-            <input
-              id="event-location"
-              v-model="formData.location"
-              type="text"
-              class="ext:w-full ext:px-3 ext:py-2 ext:border ext:border-gray-300 ext:rounded ext:focus:ring-2 ext:focus:ring-blue-500"
-              :placeholder="t('Add location')"
-            />
+            <div class="ext:relative">
+              <input
+                id="event-location"
+                v-model="formData.location"
+                type="text"
+                class="ext:w-full ext:px-3 ext:py-2 ext:border ext:border-gray-300 ext:rounded ext:focus:ring-2 ext:focus:ring-blue-500"
+                :placeholder="t('Add location')"
+                @input="handleLocationInput"
+                @blur="handleLocationBlur"
+              />
+              <div v-if="searchingLocation" class="ext:absolute ext:right-3 ext:top-2.5">
+                <svg class="ext:animate-spin ext:h-4 ext:w-4 ext:text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle class="ext:opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="ext:opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              </div>
+            </div>
+
+            <!-- Location Search Results -->
+            <div
+              v-if="locationResults.length > 0"
+              class="ext:absolute ext:z-50 ext:w-full ext:mt-1 ext:bg-white ext:border ext:border-gray-300 ext:rounded ext:shadow-lg ext:max-h-60 ext:overflow-y-auto"
+            >
+              <button
+                v-for="res in locationResults"
+                :key="res.display_name"
+                type="button"
+                class="ext:w-full ext:text-left ext:px-4 ext:py-2 ext:text-sm hover:ext:bg-gray-100 focus:ext:bg-gray-100"
+                @click="selectLocation(res.display_name)"
+              >
+                {{ res.display_name }}
+              </button>
+            </div>
           </div>
 
           <!-- Description -->
@@ -603,8 +654,9 @@ function handleExport() {
             </button>
             <button
               type="button"
-              class="ext:px-4 ext:py-2 ext:text-sm ext:text-white ext:bg-blue-600 ext:rounded hover:ext:bg-blue-700 disabled:ext:opacity-50"
-              :disabled="saving || !formData.summary"
+              class="ext:px-4 ext:py-2 ext:text-sm ext:rounded"
+              :class="(saving || !formData.summary || !formData.summary.trim()) ? 'ext:bg-gray-300 ext:text-gray-500 ext:cursor-not-allowed' : 'ext:bg-blue-600 ext:text-white hover:ext:bg-blue-700'"
+              :disabled="saving || !formData.summary || !formData.summary.trim()"
               @click="handleSave"
             >
               {{ saving ? t('Saving...') : t('Save') }}

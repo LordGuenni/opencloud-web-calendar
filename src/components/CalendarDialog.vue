@@ -142,7 +142,8 @@ function handleClose() {
           </button>
           <button
             type="button"
-            class="ext:px-4 ext:py-2 ext:text-sm ext:text-white ext:bg-blue-600 ext:rounded hover:ext:bg-blue-700 disabled:ext:opacity-50"
+            class="ext:px-4 ext:py-2 ext:text-sm ext:rounded"
+            :class="(saving || !formData.displayName) ? 'ext:bg-gray-300 ext:text-gray-500 ext:cursor-not-allowed' : 'ext:bg-blue-600 ext:text-white hover:ext:bg-blue-700'"
             :disabled="saving || !formData.displayName"
             @click="handleSave"
           >
