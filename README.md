@@ -28,17 +28,12 @@ unzip web-app-calendar.zip -d /var/lib/opencloud/web/assets/apps/web-calendar/
 
 ### 2. Register the Extension
 
-Add the extension to your OpenCloud `config.json`:
+Add the extension to your OpenCloud `apps.yaml`:
 
-```json
-{
-  "external_apps": [
-    {
-      "id": "web-calendar",
-      "path": "web/assets/apps/web-calendar/js/web-calendar.js"
-    }
-  ]
-}
+```yaml
+external_apps:
+  - id: web-calendar
+    path: web/assets/apps/web-calendar/js/web-calendar.js
 ```
 
 ### 3. Configure Content Security Policy (CSP)
@@ -84,25 +79,19 @@ Restart OpenCloud to pick up the new extension and configuration.
 
 For Kubernetes deployments using the OpenCloud Helm chart, you need to configure the following:
 
-### 1. Add Extension to config.json ConfigMap
+### 1. Add Extension to apps.yaml ConfigMap
 
 ```yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: opencloud-opencloud-config-json
+  name: opencloud-opencloud-apps-yaml
   namespace: opencloud
 data:
-  config.json: |
-    {
-      "server": "https://your-opencloud-instance.com",
-      "external_apps": [
-        {
-          "id": "web-calendar",
-          "path": "web/assets/apps/web-calendar/js/web-calendar.js"
-        }
-      ]
-    }
+  apps.yaml: |
+    external_apps:
+      - id: web-calendar
+        path: web/assets/apps/web-calendar/js/web-calendar.js
 ```
 
 ### 2. Configure CSP in Helm Values
