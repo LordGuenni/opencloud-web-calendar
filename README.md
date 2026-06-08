@@ -20,23 +20,15 @@ A CalDAV calendar application integrated as a native [OpenCloud](https://openclo
 
 ### 1. Copy the Extension Files
 
-Download the latest release archive from the [Releases](https://github.com/mschneider82/opencloud-web-calendar/releases) page and extract it into your OpenCloud web assets directory:
+Download the latest release archive from the [Releases](https://github.com/LordGuenni/opencloud-web-calendar/releases) page and extract it into your OpenCloud web assets directory:
 
 ```bash
 unzip web-app-calendar.zip -d /var/lib/opencloud/web/assets/apps/web-calendar/
 ```
 
-### 2. Register the Extension
+OpenCloud automatically discovers extensions placed in this directory.
 
-Add the extension to your OpenCloud `apps.yaml`:
-
-```yaml
-external_apps:
-  - id: web-calendar
-    path: web/assets/apps/web-calendar/js/web-calendar.js
-```
-
-### 3. Configure Content Security Policy (CSP)
+### 2. Configure Content Security Policy (CSP)
 
 Allow `data:` in `font-src` so FullCalendar's bundled icon font can load:
 
@@ -79,22 +71,7 @@ Restart OpenCloud to pick up the new extension and configuration.
 
 For Kubernetes deployments using the OpenCloud Helm chart, you need to configure the following:
 
-### 1. Add Extension to apps.yaml ConfigMap
-
-```yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: opencloud-opencloud-apps-yaml
-  namespace: opencloud
-data:
-  apps.yaml: |
-    external_apps:
-      - id: web-calendar
-        path: web/assets/apps/web-calendar/js/web-calendar.js
-```
-
-### 2. Configure CSP in Helm Values
+### 1. Configure CSP in Helm Values
 
 ```yaml
 # values.yaml or ConfigMap
