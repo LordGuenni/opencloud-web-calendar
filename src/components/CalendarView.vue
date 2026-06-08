@@ -63,6 +63,7 @@ const calendarOptions = computed<CalendarOptions>(() => ({
   dayMaxEvents: true,
   weekends: true,
   nowIndicator: true,
+  displayEventTime: false,
   eventClick: handleEventClick,
   select: handleDateSelect,
   eventDrop: handleEventDrop,
