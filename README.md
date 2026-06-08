@@ -30,7 +30,8 @@ OpenCloud automatically discovers extensions placed in this directory.
 
 ### 2. Configure Content Security Policy (CSP)
 
-Allow `data:` in `font-src` so FullCalendar's bundled icon font can load:
+Allow `data:` in `font-src` so FullCalendar's bundled icon font can load. 
+Additionally, allow `https://nominatim.openstreetmap.org/` in `connect-src` and `https://tile.openstreetmap.org/` in `img-src` to enable location search and map features:
 
 ```yaml
 # csp.yaml
@@ -38,6 +39,13 @@ directives:
   font-src:
     - "'self'"
     - "data:"
+  connect-src:
+    - "'self'"
+    - "https://nominatim.openstreetmap.org/"
+  img-src:
+    - "'self'"
+    - "data:"
+    - "https://tile.openstreetmap.org/"
 ```
 
 ### 3. Configure CalDAV Backend Proxy (if not already setup)
@@ -80,6 +88,13 @@ csp:
     font-src:
       - "'self'"
       - "data:"
+    connect-src:
+      - "'self'"
+      - "https://nominatim.openstreetmap.org/"
+    img-src:
+      - "'self'"
+      - "data:"
+      - "https://tile.openstreetmap.org/"
 ```
 
 ### 2. Configure CalDAV Proxy Routes (if not already setup)
