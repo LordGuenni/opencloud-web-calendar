@@ -40,9 +40,9 @@ directives:
     - "data:"
 ```
 
-### 4. Configure CalDAV Backend Proxy
+### 3. Configure CalDAV Backend Proxy (if not already setup)
 
-The calendar requires a CalDAV backend (e.g., Radicale). Configure your OpenCloud proxy to route CalDAV requests:
+The calendar requires a CalDAV backend (e.g., Radicale). If your OpenCloud proxy is not already configured to route CalDAV requests, add the following routes:
 
 ```yaml
 # proxy.yaml
@@ -63,7 +63,7 @@ additional_policies:
           - X-Script-Name: /caldav
 ```
 
-### 5. Restart OpenCloud
+### 4. Restart OpenCloud
 
 Restart OpenCloud to pick up the new extension and configuration.
 
@@ -82,7 +82,7 @@ csp:
       - "data:"
 ```
 
-### 3. Configure CalDAV Proxy Routes
+### 2. Configure CalDAV Proxy Routes (if not already setup)
 
 ```yaml
 # proxy.yaml ConfigMap
@@ -103,7 +103,7 @@ additional_policies:
           - X-Script-Name: /caldav
 ```
 
-### 4. Copy Extension Files
+### 3. Copy Extension Files
 
 Use an init container or ConfigMap to copy the extension files to `/var/lib/opencloud/web/assets/apps/web-calendar/`.
 
