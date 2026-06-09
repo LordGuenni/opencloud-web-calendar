@@ -5,6 +5,7 @@ export interface Calendar {
   ctag: string
   description?: string
   visible: boolean
+  readOnly?: boolean
 }
 
 export interface CalendarEvent {

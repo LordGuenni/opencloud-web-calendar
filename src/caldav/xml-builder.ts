@@ -27,6 +27,7 @@ export function buildPropfindCalendars(): string {
   <d:prop>
     <d:resourcetype/>
     <d:displayname/>
+    <d:current-user-privilege-set/>
     <c:calendar-description/>
     <ic:calendar-color/>
     <cs:getctag/>

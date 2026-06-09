@@ -1,9 +1,12 @@
 import { ref, readonly } from 'vue'
 import { getCalDAVClient } from '../caldav/client'
+import { waitForUserId } from '../caldav/auth'
 import { discoverUserPrincipal, discoverCalendarHome } from '../caldav/discovery'
 import type { Calendar } from '../types/calendar'
+import type { Share } from '../caldav/client'
 
 const calendars = ref<Calendar[]>([])
+const pendingShares = ref<Share[]>([])
 const loading = ref(false)
 const error = ref<Error | null>(null)
 const calendarHomeUrl = ref<string>('')
@@ -22,9 +25,55 @@ export function useCalendars() {
       calendarHomeUrl.value = home
 
       calendars.value = await client.discoverCalendars()
+
+      await loadPendingShares()
     } catch (err) {
       error.value = err instanceof Error ? err : new Error('Failed to load calendars')
       console.error('Failed to load calendars:', err)
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function loadPendingShares() {
+    try {
+      const currentUserId = await waitForUserId()
+      if (!currentUserId) return
+
+      const shares = await client.listShares('map')
+      pendingShares.value = shares.filter(
+        share => share.User === currentUserId && (!share.EnabledByUser || share.HiddenByUser)
+      )
+    } catch (err) {
+      console.warn('Failed to load pending shares:', err)
+    }
+  }
+
+  async function acceptShare(share: Share) {
+    loading.value = true
+    try {
+      await client.updateShare('map', {
+        PathOrToken: share.PathOrToken,
+        Enabled: true,
+        Hidden: false
+      })
+      await loadCalendars()
+    } catch (err) {
+      console.error('Failed to accept share:', err)
+      error.value = err instanceof Error ? err : new Error('Failed to accept share')
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function declineShare(share: Share) {
+    loading.value = true
+    try {
+      await client.deleteShare('map', share.PathOrToken)
+      await loadPendingShares()
+    } catch (err) {
+      console.error('Failed to decline share:', err)
+      error.value = err instanceof Error ? err : new Error('Failed to decline share')
     } finally {
       loading.value = false
     }
@@ -72,10 +121,13 @@ export function useCalendars() {
 
   return {
     calendars: readonly(calendars),
+    pendingShares: readonly(pendingShares),
     loading: readonly(loading),
     error: readonly(error),
     calendarHomeUrl: readonly(calendarHomeUrl),
     loadCalendars,
+    acceptShare,
+    declineShare,
     toggleCalendarVisibility,
     setCalendarVisibility,
     getCalendarByHref,

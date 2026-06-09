@@ -11,6 +11,7 @@ export interface CalendarData {
   ctag?: string
   description?: string
   resourceType?: string[]
+  readOnly?: boolean
 }
 
 export interface EventData {

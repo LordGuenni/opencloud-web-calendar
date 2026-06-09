@@ -36,18 +36,25 @@ const calendarColorMap = computed(() => {
 })
 
 const fullCalendarEvents = computed<EventInput[]>(() => {
-  return props.events.map((event) => ({
-    id: event.recurrenceId ? `${event.uid}_${event.recurrenceId}` : event.uid,
-    title: event.summary,
-    start: event.start,
-    end: event.end,
-    allDay: event.allDay,
-    backgroundColor: calendarColorMap.value.get(event.calendarHref) || '#3788d8',
-    borderColor: calendarColorMap.value.get(event.calendarHref) || '#3788d8',
-    extendedProps: {
-      calendarEvent: event
+  return props.events.map((event) => {
+    const calendar = props.calendars.find(c => c.href === event.calendarHref)
+    const isReadOnly = calendar?.readOnly || false
+    
+    return {
+      id: event.recurrenceId ? `${event.uid}_${event.recurrenceId}` : event.uid,
+      title: event.summary,
+      start: event.start,
+      end: event.end,
+      allDay: event.allDay,
+      backgroundColor: calendarColorMap.value.get(event.calendarHref) || '#3788d8',
+      borderColor: calendarColorMap.value.get(event.calendarHref) || '#3788d8',
+      editable: !isReadOnly,
+      extendedProps: {
+        calendarEvent: event,
+        isReadOnly
+      }
     }
-  }))
+  })
 })
 
 const calendarOptions = computed<CalendarOptions>(() => ({

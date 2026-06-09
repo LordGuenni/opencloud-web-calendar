@@ -1,4 +1,4 @@
-import { useAuthStore } from '@opencloud-eu/web-pkg'
+import { useAuthStore, useUserStore } from '@opencloud-eu/web-pkg'
 import { isRef } from 'vue'
 import { CalDAVError } from './errors'
 
@@ -26,7 +26,18 @@ export function getUserId(): string | null {
   if (!authStore) return null
   const store = authStore as unknown as Record<string, unknown>
   const userInfo = unwrapMaybeRef(store.userInfo)
-  if (!userInfo || typeof userInfo !== 'object') return null
+  if (!userInfo || typeof userInfo !== 'object') {
+    // Try userStore as fallback
+    try {
+      const userStore = useUserStore()
+      if (userStore.user) {
+        return userStore.user.id || userStore.user.onPremisesSamAccountName || userStore.user.mail || null
+      }
+    } catch {
+      // Ignore
+    }
+    return null
+  }
 
   const info = userInfo as Record<string, unknown>
   return (
@@ -35,6 +46,16 @@ export function getUserId(): string | null {
     readStringMaybeRef(info.username) ||
     readStringMaybeRef(info.email)
   )
+}
+
+export async function waitForUserId(timeoutMs = 5000): Promise<string | null> {
+  const start = Date.now()
+  while (Date.now() - start < timeoutMs) {
+    const id = getUserId()
+    if (id) return id
+    await new Promise(resolve => setTimeout(resolve, 100))
+  }
+  return null
 }
 
 export function authenticatedFetch(url: string, options: RequestInit = {}): Promise<Response> {
@@ -78,7 +99,14 @@ function normalizeCalDAVUrl(url: string): string {
     throw new CalDAVError('Refusing cross-origin CalDAV request')
   }
 
-  if (!(parsed.pathname === '/caldav' || parsed.pathname.startsWith('/caldav/'))) {
+  if (
+    !(
+      parsed.pathname === '/caldav' ||
+      parsed.pathname.startsWith('/caldav/') ||
+      parsed.pathname.startsWith('/.sharing/') ||
+      parsed.pathname.startsWith('/.token/')
+    )
+  ) {
     throw new CalDAVError('Refusing request outside CalDAV endpoint')
   }
 

@@ -322,3 +322,19 @@ type = none
 # When returning a free-busy report, limit the number of returned
 # occurences per event to prevent DOS attacks.
 #max_freebusy_occurrence = 10000
+
+[sharing]
+# Sharing database type (none | csv | files)
+type = csv
+
+# Share collection by token
+collection_by_token = true
+
+# Share collection by map
+collection_by_map = true
+
+# Permit create of token-based sharing
+permit_create_token = true
+
+# Permit create of map-based sharing
+permit_create_map = true

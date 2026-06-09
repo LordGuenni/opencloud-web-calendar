@@ -8,6 +8,7 @@ import EventDialog from '../components/EventDialog.vue'
 import CalendarDialog from '../components/CalendarDialog.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import ICSImportDialog from '../components/ICSImportDialog.vue'
+import CalendarSharingDialog from '../components/CalendarSharingDialog.vue'
 import { useCalendars } from '../composables/useCalendars'
 import { useEvents } from '../composables/useEvents'
 import { useEventEditor } from '../composables/useEventEditor'
@@ -17,7 +18,7 @@ import { getExtendedRange } from '../utils/date'
 import { getCalDAVClient } from '../caldav/client'
 import { initAuthStore } from '../caldav/auth'
 import { initLanguage, t } from '../composables/useLanguage'
-import type { CalendarEvent } from '../types/calendar'
+import type { Calendar, CalendarEvent } from '../types/calendar'
 
 // Initialize auth store for CalDAV requests
 const authStore = useAuthStore()
@@ -61,6 +62,9 @@ const confirmDelete = ref<{
   calendarHref: string
   calendarName: string
 } | null>(null)
+
+// Sharing dialog state
+const sharingCalendar = ref<Calendar | null>(null)
 
 const calendarViewRef = ref<InstanceType<typeof CalendarView> | null>(null)
 const currentDate = ref(new Date())
@@ -180,6 +184,13 @@ function handleDeleteCalendar(calendarHref: string) {
   }
 }
 
+function handleShareCalendar(calendarHref: string) {
+  const calendar = calendars.value.find((c) => c.href === calendarHref)
+  if (calendar) {
+    sharingCalendar.value = calendar
+  }
+}
+
 async function confirmCalendarDeletion() {
   if (!confirmDelete.value) return
 
@@ -231,12 +242,16 @@ async function handleImported() {
 
       <CalendarSidebar
         :calendars="calendars"
+        :pending-shares="pendingShares"
         :loading="calendarsLoading"
         :is-open="sidebarOpen"
         @toggle="handleToggleCalendar"
         @create="handleCreateCalendar"
         @delete="handleDeleteCalendar"
+        @share="handleShareCalendar"
         @import="handleImportCalendar"
+        @accept-share="acceptShare"
+        @decline-share="declineShare"
       />
 
       <CalendarView
@@ -266,6 +281,13 @@ async function handleImported() {
       :calendar-home-url="calendarHomeUrl"
       :default-calendar="getDefaultCalendar() || null"
       @imported="handleImported"
+    />
+
+    <CalendarSharingDialog
+      v-if="sharingCalendar"
+      :calendar="sharingCalendar"
+      :is-open="!!sharingCalendar"
+      @close="sharingCalendar = null"
     />
 
     <ConfirmDialog

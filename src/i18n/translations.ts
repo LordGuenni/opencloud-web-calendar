@@ -18,6 +18,11 @@ export const translations = {
     'Loading calendars...': 'Loading calendars...',
     'No calendars found': 'No calendars found',
     'Delete calendar': 'Delete calendar',
+    'Share calendar': 'Share calendar',
+    'Pending Invitations': 'Pending Invitations',
+    'From:': 'From:',
+    Accept: 'Accept',
+    Decline: 'Decline',
 
     // Event Dialog
     'Edit Event': 'Edit Event',
@@ -109,6 +114,20 @@ export const translations = {
     'Show details': 'Show details',
     'Hide details': 'Hide details',
 
+    // Sharing
+    'Share calendar: %{name}': 'Share calendar: %{name}',
+    'Share with users': 'Share with users',
+    'User ID or Email': 'User ID or Email',
+    Read: 'Read',
+    'Read & Write': 'Read & Write',
+    Invite: 'Invite',
+    'Read only': 'Read only',
+    'Public links': 'Public links',
+    'Create link': 'Create link',
+    'Read only link': 'Read only link',
+    Copy: 'Copy',
+    'No public links created yet': 'No public links created yet',
+
     // Confirm Dialog
     Confirm: 'Confirm',
 
@@ -133,6 +152,7 @@ export const translations = {
     'Loading calendars...': 'Kalender werden geladen...',
     'No calendars found': 'Keine Kalender gefunden',
     'Delete calendar': 'Kalender löschen',
+    'Share calendar': 'Kalender teilen',
 
     // Event Dialog
     'Edit Event': 'Termin bearbeiten',
@@ -223,6 +243,21 @@ export const translations = {
     'Parse warnings': 'Hinweise beim Einlesen',
     'Show details': 'Details anzeigen',
     'Hide details': 'Details ausblenden',
+
+    // Sharing
+    'Share calendar: %{name}': 'Kalender teilen: %{name}',
+    'Share with users': 'Mit Benutzern teilen',
+    'User ID or Email': 'Benutzer ID oder E-Mail',
+    Read: 'Lesen',
+    'Read & Write': 'Lesen & Schreiben',
+    Invite: 'Einladen',
+    'Read only': 'Nur lesen',
+    'Public links': 'Öffentliche Links',
+    'Create link': 'Link erstellen',
+    'Read only link': 'Schreibgeschützter Link',
+    Copy: 'Kopieren',
+    'No public links created yet': 'Noch keine öffentlichen Links erstellt',
+    'This calendar is read-only. You cannot make changes.': 'Dieser Kalender ist schreibgeschützt. Sie können keine Änderungen vornehmen.',
 
     // Confirm Dialog
     Confirm: 'Bestätigen',

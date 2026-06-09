@@ -66,19 +66,60 @@ export function parseCalendars(xml: string): CalendarData[] {
     const href = response.href
     if (!href) continue
 
-    const propstat = Array.isArray(response.propstat) ? response.propstat[0] : response.propstat
-    const prop = propstat?.prop
-    if (!prop) continue
+    const propstats = Array.isArray(response.propstat) ? response.propstat : [response.propstat]
+    
+    let resourceType: Record<string, unknown> | undefined
+    let displayname: unknown
+    let color: unknown
+    let ctag: unknown
+    let description: unknown
+    let privileges: any
+    let foundCalendar = false
 
-    const resourceType = prop['resourcetype'] as Record<string, unknown> | undefined
-    if (!resourceType || !('calendar' in resourceType)) continue
+    for (const propstat of propstats) {
+      if (!propstat?.prop) continue
+      
+      // We only care about properties that were successfully retrieved (HTTP 200)
+      if (propstat.status && !propstat.status.includes('200')) {
+        continue
+      }
+
+      const prop = propstat.prop
+      
+      if (prop['resourcetype']) {
+        resourceType = prop['resourcetype'] as Record<string, unknown>
+        if (resourceType && 'calendar' in resourceType) {
+          foundCalendar = true
+        }
+      }
+      
+      if (prop['displayname'] !== undefined) displayname = prop['displayname']
+      if (prop['calendar-color'] !== undefined) color = prop['calendar-color']
+      if (prop['getctag'] !== undefined) ctag = prop['getctag']
+      if (prop['calendar-description'] !== undefined) description = prop['calendar-description']
+      if (prop['current-user-privilege-set'] !== undefined) privileges = prop['current-user-privilege-set']
+    }
+
+    if (!foundCalendar) continue
+
+    let readOnly = false
+    if (privileges && typeof privileges === 'object' && privileges.privilege) {
+      // If we explicitly received a privilege object with actual privileges
+      const privString = JSON.stringify(privileges.privilege).toLowerCase()
+      const hasWrite = privString.includes('write') || privString.includes('all')
+      readOnly = !hasWrite
+    } else {
+      // If no explicit privilege data is found, or it's empty, default to owner (writable)
+      readOnly = false
+    }
 
     calendars.push({
       href,
-      displayName: extractString(prop['displayname']),
-      color: extractString(prop['calendar-color']),
-      ctag: extractString(prop['getctag']),
-      description: extractString(prop['calendar-description'])
+      displayName: extractString(displayname),
+      color: extractString(color),
+      ctag: extractString(ctag),
+      description: extractString(description),
+      readOnly
     })
   }
 

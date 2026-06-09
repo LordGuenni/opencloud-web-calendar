@@ -202,7 +202,17 @@ watch(
   }
 )
 
+const writableCalendars = computed(() => {
+  return props.calendars.filter((cal) => !cal.readOnly)
+})
+
+const isReadOnly = computed(() => {
+  const calendar = props.calendars.find((c) => c.href === formData.value.calendarHref)
+  return calendar?.readOnly || false
+})
+
 async function handleSave() {
+  if (isReadOnly.value) return
   const result = await save()
   if (result) {
     emit('saved')
@@ -210,6 +220,7 @@ async function handleSave() {
 }
 
 async function handleDelete() {
+  if (isReadOnly.value) return
   const success = await deleteEvent()
   if (success) {
     emit('deleted')
@@ -376,7 +387,7 @@ function handleExport() {
               v-model="formData.calendarHref"
               class="ext:w-full ext:px-3 ext:py-2 ext:text-gray-900 ext:border ext:border-gray-300 ext:rounded ext:focus:ring-2 ext:focus:ring-blue-500"
             >
-              <option v-for="cal in calendars" :key="cal.href" :value="cal.href">
+              <option v-for="cal in writableCalendars" :key="cal.href" :value="cal.href">
                 {{ cal.displayName }}
               </option>
             </select>

@@ -14,10 +14,12 @@ import {
   deleteCalendar as deleteCalendarRequest,
   type CreateCalendarData
 } from './calendar-management'
+import * as sharing from './sharing'
 import type { Calendar, CalendarEvent, EventFormData, DateRange } from '../types/calendar'
 
 export { CalDAVError, AuthenticationError, NotFoundError, ConflictError, NetworkError } from './errors'
 export type { CreateCalendarData } from './calendar-management'
+export type { Share, ShareInfo, ShareType } from './sharing'
 
 export interface CalDAVClient {
   discoverCalendars(): Promise<Calendar[]>
@@ -33,6 +35,17 @@ export interface CalDAVClient {
   updateEventSeries(event: CalendarEvent, formData: EventFormData): Promise<void>
   createCalendar(calendarHomeUrl: string, data: CreateCalendarData): Promise<Calendar>
   deleteCalendar(calendarHref: string): Promise<void>
+
+  // Sharing methods
+  getSharingInfo(): Promise<sharing.ShareInfo>
+  listShares(type?: sharing.ShareType, filter?: { PathOrToken?: string; PathMapped?: string }): Promise<sharing.Share[]>
+  createShare(type: 'map' | 'token', data: any): Promise<{ PathOrToken: string }>
+  updateShare(type: 'map' | 'token', data: any): Promise<void>
+  deleteShare(type: 'map' | 'token', PathOrToken: string): Promise<void>
+  enableShare(type: 'map' | 'token', PathOrToken: string): Promise<void>
+  disableShare(type: 'map' | 'token', PathOrToken: string): Promise<void>
+  hideShare(type: 'map' | 'token', PathOrToken: string): Promise<void>
+  unhideShare(type: 'map' | 'token', PathOrToken: string): Promise<void>
 }
 
 export function createCalDAVClient(): CalDAVClient {
@@ -59,7 +72,18 @@ export function createCalDAVClient(): CalDAVClient {
     deleteEventOccurrence,
     updateEventSeries,
     createCalendar: createCalendarRequest,
-    deleteCalendar: deleteCalendarRequest
+    deleteCalendar: deleteCalendarRequest,
+
+    // Sharing methods
+    getSharingInfo: sharing.getSharingInfo,
+    listShares: sharing.listShares,
+    createShare: sharing.createShare,
+    updateShare: sharing.updateShare,
+    deleteShare: sharing.deleteShare,
+    enableShare: sharing.enableShare,
+    disableShare: sharing.disableShare,
+    hideShare: sharing.hideShare,
+    unhideShare: sharing.unhideShare
   }
 }
 
