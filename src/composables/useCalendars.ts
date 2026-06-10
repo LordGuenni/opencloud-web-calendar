@@ -15,7 +15,7 @@ let pollInterval: ReturnType<typeof setInterval> | null = null
 
 export function useCalendars() {
   const client = getCalDAVClient()
-  const { userProfiles, loadUserProfile } = useUserProfiles()
+  const { userProfiles, loadUserProfile, cleanUserId } = useUserProfiles()
 
   async function loadCalendars(): Promise<void> {
     loading.value = true
@@ -35,7 +35,7 @@ export function useCalendars() {
       const allShares = await client.listShares('all')
 
       // Process discovered calendars and identify shared ones
-      calendars.value = discovered.map(cal => {
+      calendars.value = (discovered.map(cal => {
         // Radicale calendars in 'all' list have PathOrToken starting with / recipientId /
         // We match them by comparing the trailing part of the href with PathOrToken
         const calPath = cal.href.startsWith('/caldav/') ? cal.href.slice(7) : cal.href
@@ -47,30 +47,42 @@ export function useCalendars() {
           calPath.endsWith(s.PathOrToken)
         )
 
-        if (matchingShare && matchingShare.Owner.toLowerCase().trim() !== normalizedCurrentUserId) {
-          // It's a shared calendar owned by someone else
-          loadUserProfile(matchingShare.Owner)
+        const ownerId = matchingShare ? cleanUserId(matchingShare.Owner) : null
+        if (matchingShare && ownerId && ownerId.toLowerCase().trim() !== normalizedCurrentUserId) {
+          // If the recipient has NOT enabled this share, don't show it in the main list
+          if (!matchingShare.EnabledByUser || matchingShare.HiddenByUser || !matchingShare.EnabledByOwner) {
+            return null
+          }
+
+          // It's an active shared calendar owned by someone else
+          loadUserProfile(ownerId)
           return {
             ...cal,
             isShared: true,
-            owner: matchingShare.Owner,
+            owner: ownerId,
             sharePathOrToken: matchingShare.PathOrToken
           }
         }
         return cal
-      })
+      }).filter(Boolean) as Calendar[])
 
-      // Identify pending invitations (exclude those owned by the current user)
+      // Identify pending invitations
       pendingShares.value = allShares.filter(
         share => {
-          const normalizedOwner = share.Owner.toLowerCase().trim()
-          if (normalizedOwner === normalizedCurrentUserId) return false
+          const ownerId = cleanUserId(share.Owner)
+          if (ownerId.toLowerCase().trim() === normalizedCurrentUserId) return false
+
+          // MUST be enabled by owner to be a valid invitation
+          if (!share.EnabledByOwner) return false
+          
+          // An invitation is "Pending" if it's NOT enabled by user AND it's STILL hidden (Radicale default)
+          if (share.EnabledByUser || !share.HiddenByUser) return false
 
           // If explicitly shared with this user
           if (share.User) {
             const normalizedShareUser = share.User.toLowerCase().trim()
             if (normalizedShareUser === normalizedCurrentUserId) {
-              return !share.EnabledByUser || share.HiddenByUser
+              return true
             }
           }
 
@@ -78,18 +90,14 @@ export function useCalendars() {
           const pathOrToken = share.PathOrToken.toLowerCase()
           const isOurPath = pathOrToken.includes(`/${normalizedCurrentUserId}/`)
 
-          if (isOurPath) {
-            return !share.EnabledByUser || share.HiddenByUser
-          }
-
-          return false
+          return isOurPath
         }
       )
 
       // Resolve owner profiles for all pending shares
       for (const share of pendingShares.value) {
         if (share.Owner) {
-          loadUserProfile(share.Owner)
+          loadUserProfile(cleanUserId(share.Owner))
         }
       }
     } catch (err) {
@@ -130,6 +138,7 @@ export function useCalendars() {
   async function acceptShare(share: Share) {
     loading.value = true
     try {
+      // To Accept, we set EnabledByUser: true AND HiddenByUser: false
       await client.updateShare('map', {
         PathOrToken: share.PathOrToken,
         Enabled: true,
@@ -144,10 +153,38 @@ export function useCalendars() {
     }
   }
 
+  /**
+   * Resiliently removes/hides a share for a recipient.
+   * To "Leave", we set BOTH EnabledByUser and HiddenByUser to false.
+   * This distinguishes it from "Invited" (false, true).
+   */
+  async function recipientRemoveShare(pathOrToken: string) {
+    const cleanPath = pathOrToken.startsWith('/') ? pathOrToken.slice(1) : pathOrToken
+    const pathsToTry = [...new Set([
+      pathOrToken,
+      pathOrToken.endsWith('/') ? pathOrToken : `${pathOrToken}/`,
+      `/${pathOrToken}`,
+      `/${cleanPath}/`,
+      cleanPath
+    ])]
+
+    let lastErr: any = null
+
+    // recipients are permitted to toggle HiddenByUser and EnabledByUser
+    for (const p of pathsToTry) {
+      try {
+        await client.updateShare('map', { PathOrToken: p, Enabled: false, Hidden: false })
+        return true
+      } catch (e) { lastErr = e }
+    }
+
+    throw lastErr || new Error('Failed to hide shared calendar')
+  }
+
   async function declineShare(share: Share) {
     loading.value = true
     try {
-      await client.deleteShare('map', share.PathOrToken)
+      await recipientRemoveShare(share.PathOrToken)
       await loadCalendars()
     } catch (err) {
       console.error('Failed to decline share:', err)
@@ -162,8 +199,8 @@ export function useCalendars() {
 
     loading.value = true
     try {
-      // In Radicale, the recipient "leaves" by deleting their mapping resource
-      await client.deleteCalendar(calendar.href)
+      const path = calendar.sharePathOrToken || (calendar.href.startsWith('/caldav/') ? calendar.href.slice(7) : calendar.href)
+      await recipientRemoveShare(path)
       await loadCalendars()
       return true
     } catch (err) {

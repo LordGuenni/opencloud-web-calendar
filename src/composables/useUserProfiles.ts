@@ -1,19 +1,37 @@
-import { ref } from 'vue'
+import { reactive } from 'vue'
 import { getAccessToken } from '../caldav/auth'
 
-const userProfiles = ref<Record<string, string>>({})
+const userProfiles = reactive<Record<string, string>>({})
 
 export function useUserProfiles() {
+  function cleanUserId(id: string): string {
+    if (!id) return id
+    // If it's a URL or path, get the last segment
+    if (id.includes('/')) {
+      const segments = id.split('/').filter(Boolean)
+      // For principal URLs like /caldav/user/, segments are ['caldav', 'user']
+      // We want the last one, unless it's 'caldav'
+      if (segments.length > 1 && segments[0] === 'caldav') {
+        return segments[1]
+      }
+      return segments.pop() || id
+    }
+    return id
+  }
+
   async function loadUserProfile(userId: string): Promise<string> {
-    if (userProfiles.value[userId]) return userProfiles.value[userId]
+    const cleanedId = cleanUserId(userId)
+    if (userProfiles[cleanedId]) return userProfiles[cleanedId]
+    if (userProfiles[userId]) return userProfiles[userId]
 
     try {
       const token = getAccessToken()
-      if (!token) return userId
+      if (!token) return cleanedId
 
       const origin = typeof window !== 'undefined' && window.location?.origin ? window.location.origin : ''
-      const url = `${origin}/graph/v1.0/users/${userId}`
-
+      
+      // Try direct ID lookup first
+      const url = `${origin}/graph/v1.0/users/${cleanedId}`
       const response = await fetch(url, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -23,13 +41,35 @@ export function useUserProfiles() {
 
       if (response.ok) {
         const user = await response.json()
-        userProfiles.value[userId] = user.displayName || user.onPremisesSamAccountName || userId
-        return userProfiles.value[userId]
+        const name = user.displayName || user.onPremisesSamAccountName || cleanedId
+        userProfiles[cleanedId] = name
+        userProfiles[userId] = name
+        return name
+      }
+
+      // Fallback: search by ID/username
+      const searchUrl = `${origin}/graph/v1.0/users?$search=${encodeURIComponent(cleanedId)}`
+      const searchResponse = await fetch(searchUrl, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json'
+        }
+      })
+
+      if (searchResponse.ok) {
+        const data = await searchResponse.json()
+        const user = data.value?.find((u: any) => u.id === cleanedId || u.onPremisesSamAccountName === cleanedId || u.mail === cleanedId) || data.value?.[0]
+        if (user) {
+          const name = user.displayName || user.onPremisesSamAccountName || cleanedId
+          userProfiles[cleanedId] = name
+          userProfiles[userId] = name
+          return name
+        }
       }
     } catch {
       // Silently fail and use UUID
     }
-    return userId
+    return cleanedId
   }
 
   async function resolveUser(userIdOrEmail: string): Promise<string> {
@@ -66,12 +106,12 @@ export function useUserProfiles() {
     )
 
     if (exactMatch && exactMatch.id) {
-      userProfiles.value[exactMatch.id] = exactMatch.displayName || exactMatch.onPremisesSamAccountName || exactMatch.id
+      userProfiles[exactMatch.id] = exactMatch.displayName || exactMatch.onPremisesSamAccountName || exactMatch.id
       return exactMatch.id
     }
 
     if (users.length > 0 && users[0].id) {
-      userProfiles.value[users[0].id] = users[0].displayName || users[0].onPremisesSamAccountName || users[0].id
+      userProfiles[users[0].id] = users[0].displayName || users[0].onPremisesSamAccountName || users[0].id
       return users[0].id
     }
 
@@ -81,6 +121,7 @@ export function useUserProfiles() {
   return {
     userProfiles,
     loadUserProfile,
-    resolveUser
+    resolveUser,
+    cleanUserId
   }
 }

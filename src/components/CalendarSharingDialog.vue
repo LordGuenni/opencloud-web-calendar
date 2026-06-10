@@ -132,7 +132,28 @@ function getShareUrl(token: string) {
                   {{ (userProfiles[share.User] || share.User).slice(0, 2).toUpperCase() }}
                 </div>
                 <div>
-                  <div class="ext:text-sm ext:font-medium ext:text-gray-900">{{ userProfiles[share.User] || share.User }}</div>
+                  <div class="ext:flex ext:items-center ext:gap-2">
+                    <span class="ext:text-sm ext:font-medium ext:text-gray-900">{{ userProfiles[share.User] || share.User }}</span>
+                    <!-- Status Badges -->
+                    <span
+                      v-if="share.EnabledByUser"
+                      class="ext:px-1.5 ext:py-0.5 ext:text-[10px] ext:font-medium ext:bg-green-100 ext:text-green-700 ext:rounded"
+                    >
+                      {{ t('Accepted') }}
+                    </span>
+                    <span
+                      v-else-if="!share.EnabledByUser && !share.HiddenByUser"
+                      class="ext:px-1.5 ext:py-0.5 ext:text-[10px] ext:font-medium ext:bg-yellow-100 ext:text-yellow-700 ext:rounded"
+                    >
+                      {{ t('Invited') }}
+                    </span>
+                    <span
+                      v-else
+                      class="ext:px-1.5 ext:py-0.5 ext:text-[10px] ext:font-medium ext:bg-red-100 ext:text-red-700 ext:rounded"
+                    >
+                      {{ t('Left') }}
+                    </span>
+                  </div>
                   <div class="ext:text-xs ext:text-gray-500">
                     {{ share.Permissions === 'r' ? t('Read only') : t('Read & Write') }}
                   </div>
@@ -150,6 +171,7 @@ function getShareUrl(token: string) {
                 <button
                   type="button"
                   class="ext:p-1 ext:text-gray-400 hover:ext:text-red-600"
+                  :title="t('Remove share')"
                   @click="removeShare(share)"
                 >
                   <svg class="ext:w-4 ext:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
