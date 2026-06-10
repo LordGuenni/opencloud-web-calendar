@@ -1,6 +1,5 @@
 import {
   defineWebApplication,
-  ApplicationSetupOptions,
   Extension,
   AppMenuItemExtension
 } from '@opencloud-eu/web-pkg'
@@ -11,7 +10,7 @@ import { computed } from 'vue'
 import { initLanguage, t } from './composables/useLanguage'
 
 export default defineWebApplication({
-  setup(args) {
+  setup() {
     // Initialize language early
     initLanguage()
 
@@ -34,7 +33,7 @@ export default defineWebApplication({
       }
     ]
 
-    const extensions = ({ applicationConfig }: ApplicationSetupOptions) => {
+    const extensions = () => {
       return computed<Extension[]>(() => {
         const menuItems: AppMenuItemExtension[] = [
           {
@@ -53,7 +52,7 @@ export default defineWebApplication({
     return {
       appInfo,
       routes,
-      extensions: extensions(args)
+      extensions: extensions()
     }
   }
 })

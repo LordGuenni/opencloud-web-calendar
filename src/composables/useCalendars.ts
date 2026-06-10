@@ -74,7 +74,7 @@ export function useCalendars() {
 
           // MUST be enabled by owner to be a valid invitation
           if (!share.EnabledByOwner) return false
-          
+
           // An invitation is "Pending" if it's NOT enabled by user AND it's STILL hidden (Radicale default)
           if (share.EnabledByUser || !share.HiddenByUser) return false
 
@@ -154,31 +154,18 @@ export function useCalendars() {
   }
 
   /**
-   * Resiliently removes/hides a share for a recipient.
+   * Removes/hides a share for a recipient.
    * To "Leave", we set BOTH EnabledByUser and HiddenByUser to false.
    * This distinguishes it from "Invited" (false, true).
    */
   async function recipientRemoveShare(pathOrToken: string) {
-    const cleanPath = pathOrToken.startsWith('/') ? pathOrToken.slice(1) : pathOrToken
-    const pathsToTry = [...new Set([
-      pathOrToken,
-      pathOrToken.endsWith('/') ? pathOrToken : `${pathOrToken}/`,
-      `/${pathOrToken}`,
-      `/${cleanPath}/`,
-      cleanPath
-    ])]
-
-    let lastErr: any = null
-
-    // recipients are permitted to toggle HiddenByUser and EnabledByUser
-    for (const p of pathsToTry) {
-      try {
-        await client.updateShare('map', { PathOrToken: p, Enabled: false, Hidden: false })
-        return true
-      } catch (e) { lastErr = e }
+    try {
+      await client.updateShare('map', { PathOrToken: pathOrToken, Enabled: false, Hidden: false })
+      return true
+    } catch (e) {
+      console.error('Failed to update share map:', e)
+      throw new Error('Failed to hide shared calendar')
     }
-
-    throw lastErr || new Error('Failed to hide shared calendar')
   }
 
   async function declineShare(share: Share) {

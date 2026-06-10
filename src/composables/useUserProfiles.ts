@@ -29,7 +29,7 @@ export function useUserProfiles() {
       if (!token) return cleanedId
 
       const origin = typeof window !== 'undefined' && window.location?.origin ? window.location.origin : ''
-      
+
       // Try direct ID lookup first
       const url = `${origin}/graph/v1.0/users/${cleanedId}`
       const response = await fetch(url, {
