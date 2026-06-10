@@ -1,7 +1,8 @@
-import { ref, readonly } from 'vue'
+import { ref, readonly, onMounted, onUnmounted } from 'vue'
 import { getCalDAVClient } from '../caldav/client'
 import { waitForUserId } from '../caldav/auth'
 import { discoverUserPrincipal, discoverCalendarHome } from '../caldav/discovery'
+import { useUserProfiles } from './useUserProfiles'
 import type { Calendar } from '../types/calendar'
 import type { Share } from '../caldav/client'
 
@@ -10,9 +11,11 @@ const pendingShares = ref<Share[]>([])
 const loading = ref(false)
 const error = ref<Error | null>(null)
 const calendarHomeUrl = ref<string>('')
+let pollInterval: ReturnType<typeof setInterval> | null = null
 
 export function useCalendars() {
   const client = getCalDAVClient()
+  const { userProfiles, loadUserProfile } = useUserProfiles()
 
   async function loadCalendars(): Promise<void> {
     loading.value = true
@@ -40,14 +43,66 @@ export function useCalendars() {
       const currentUserId = await waitForUserId()
       if (!currentUserId) return
 
-      const shares = await client.listShares('map')
+      const shares = await client.listShares('all')
+      const normalizedCurrentUserId = currentUserId.toLowerCase().trim()
+
       pendingShares.value = shares.filter(
-        share => share.User === currentUserId && (!share.EnabledByUser || share.HiddenByUser)
+        share => {
+          // If explicitly shared with this user
+          if (share.User) {
+            const normalizedShareUser = share.User.toLowerCase().trim()
+            if (normalizedShareUser === normalizedCurrentUserId) {
+              return !share.EnabledByUser || share.HiddenByUser
+            }
+          }
+
+          // Radicale sometimes doesn't set 'User' on 'all' list for the recipient
+          // but we can identify it if PathOrToken contains our userId and it's not owned by us
+          const pathOrToken = share.PathOrToken.toLowerCase()
+          const isOurPath = pathOrToken.includes(`/${normalizedCurrentUserId}/`)
+          const isNotOurOwn = share.Owner.toLowerCase().trim() !== normalizedCurrentUserId
+
+          if (isOurPath && isNotOurOwn) {
+            return !share.EnabledByUser || share.HiddenByUser
+          }
+
+          return false
+        }
       )
+
+      // Resolve owner profiles for all pending shares
+      for (const share of pendingShares.value) {
+        if (share.Owner) {
+          loadUserProfile(share.Owner)
+        }
+      }
     } catch (err) {
       console.warn('Failed to load pending shares:', err)
     }
   }
+
+  function startPolling() {
+    if (pollInterval) return
+    // Poll for new invitations every 30 seconds
+    pollInterval = setInterval(() => {
+      loadPendingShares()
+    }, 30000)
+  }
+
+  function stopPolling() {
+    if (pollInterval) {
+      clearInterval(pollInterval)
+      pollInterval = null
+    }
+  }
+
+  onMounted(() => {
+    startPolling()
+  })
+
+  onUnmounted(() => {
+    stopPolling()
+  })
 
   async function acceptShare(share: Share) {
     loading.value = true
@@ -122,10 +177,12 @@ export function useCalendars() {
   return {
     calendars: readonly(calendars),
     pendingShares: readonly(pendingShares),
+    userProfiles,
     loading: readonly(loading),
     error: readonly(error),
     calendarHomeUrl: readonly(calendarHomeUrl),
     loadCalendars,
+    loadPendingShares,
     acceptShare,
     declineShare,
     toggleCalendarVisibility,

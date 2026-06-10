@@ -67,7 +67,7 @@ export function parseCalendars(xml: string): CalendarData[] {
     if (!href) continue
 
     const propstats = Array.isArray(response.propstat) ? response.propstat : [response.propstat]
-    
+
     let resourceType: Record<string, unknown> | undefined
     let displayname: unknown
     let color: unknown
@@ -78,21 +78,21 @@ export function parseCalendars(xml: string): CalendarData[] {
 
     for (const propstat of propstats) {
       if (!propstat?.prop) continue
-      
+
       // We only care about properties that were successfully retrieved (HTTP 200)
       if (propstat.status && !propstat.status.includes('200')) {
         continue
       }
 
       const prop = propstat.prop
-      
+
       if (prop['resourcetype']) {
         resourceType = prop['resourcetype'] as Record<string, unknown>
         if (resourceType && 'calendar' in resourceType) {
           foundCalendar = true
         }
       }
-      
+
       if (prop['displayname'] !== undefined) displayname = prop['displayname']
       if (prop['calendar-color'] !== undefined) color = prop['calendar-color']
       if (prop['getctag'] !== undefined) ctag = prop['getctag']

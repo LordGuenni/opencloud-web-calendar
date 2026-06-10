@@ -32,9 +32,14 @@ const {
   loading: calendarsLoading,
   calendarHomeUrl,
   loadCalendars,
+  loadPendingShares,
   toggleCalendarVisibility,
   getDefaultCalendar,
-  deleteCalendar
+  deleteCalendar,
+  pendingShares,
+  acceptShare,
+  declineShare,
+  userProfiles
 } = useCalendars()
 
 const {
@@ -252,6 +257,7 @@ async function handleImported() {
         @import="handleImportCalendar"
         @accept-share="acceptShare"
         @decline-share="declineShare"
+        @refresh="loadCalendars"
       />
 
       <CalendarView

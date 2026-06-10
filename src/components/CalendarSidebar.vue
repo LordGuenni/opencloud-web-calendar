@@ -6,6 +6,7 @@ import { t } from '../composables/useLanguage'
 defineProps<{
   calendars: readonly Calendar[]
   pendingShares?: readonly Share[]
+  userProfiles?: Record<string, string>
   loading: boolean
   isOpen: boolean
 }>()
@@ -18,6 +19,7 @@ const emit = defineEmits<{
   import: []
   acceptShare: [share: Share]
   declineShare: [share: Share]
+  refresh: []
 }>()
 </script>
 
@@ -42,11 +44,11 @@ const emit = defineEmits<{
             :key="share.PathOrToken"
             class="ext:p-2 ext:bg-white ext:border ext:border-yellow-200 ext:rounded-md ext:shadow-sm"
           >
-            <div class="ext:text-sm ext:font-medium ext:text-gray-900 ext:truncate ext:mb-1">
+            <div class="ext:text-sm font-medium ext:text-gray-900 ext:truncate ext:mb-1">
               {{ share.PathOrToken.split('/').filter(Boolean).pop()?.replace('-shared', '') || t('Calendar') }}
             </div>
             <div class="ext:text-xs ext:text-gray-500 ext:truncate ext:mb-2">
-              {{ t('From:') }} {{ share.Owner }}
+              {{ t('From:') }} {{ userProfiles?.[share.Owner] || share.Owner }}
             </div>
             <div class="ext:flex ext:gap-2">
               <button
@@ -76,6 +78,23 @@ const emit = defineEmits<{
           <button
             type="button"
             class="ext:p-1 ext:text-blue-600 hover:ext:bg-blue-50 ext:rounded"
+            :title="t('Refresh')"
+            :disabled="loading"
+            @click="emit('refresh')"
+          >
+            <svg
+              class="ext:w-5 ext:h-5"
+              :class="{ 'ext:animate-spin': loading }"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            class="ext:p-1 ext:text-blue-600 hover:ext:bg-blue-50 ext:rounded"
             :title="t('Import calendar')"
             @click="emit('import')"
           >
@@ -96,7 +115,7 @@ const emit = defineEmits<{
         </div>
       </div>
 
-      <div v-if="loading" class="ext:text-sm ext:text-gray-500">
+      <div v-if="loading && calendars.length === 0" class="ext:text-sm ext:text-gray-500">
         {{ t('Loading calendars...') }}
       </div>
 

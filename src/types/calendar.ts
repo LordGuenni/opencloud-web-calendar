@@ -6,6 +6,9 @@ export interface Calendar {
   description?: string
   visible: boolean
   readOnly?: boolean
+  isShared?: boolean
+  owner?: string
+  sharePathOrToken?: string
 }
 
 export interface CalendarEvent {
