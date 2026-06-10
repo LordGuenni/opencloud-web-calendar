@@ -36,6 +36,7 @@ const {
   toggleCalendarVisibility,
   getDefaultCalendar,
   deleteCalendar,
+  leaveCalendar,
   pendingShares,
   acceptShare,
   declineShare,
@@ -62,10 +63,12 @@ function toggleSidebar() {
 }
 
 // Confirmation dialog state
-const confirmDelete = ref<{
+const confirmAction = ref<{
+  type: 'delete' | 'leave'
   isOpen: boolean
   calendarHref: string
   calendarName: string
+  calendar?: Calendar
 } | null>(null)
 
 // Sharing dialog state
@@ -181,10 +184,12 @@ function handleCreateCalendar() {
 function handleDeleteCalendar(calendarHref: string) {
   const calendar = calendars.value.find((c) => c.href === calendarHref)
   if (calendar) {
-    confirmDelete.value = {
+    confirmAction.value = {
+      type: calendar.isShared ? 'leave' : 'delete',
       isOpen: true,
       calendarHref,
-      calendarName: calendar.displayName
+      calendarName: calendar.displayName,
+      calendar
     }
   }
 }
@@ -196,19 +201,25 @@ function handleShareCalendar(calendarHref: string) {
   }
 }
 
-async function confirmCalendarDeletion() {
-  if (!confirmDelete.value) return
+async function confirmCalendarAction() {
+  if (!confirmAction.value) return
 
-  const success = await deleteCalendar(confirmDelete.value.calendarHref)
+  let success = false
+  if (confirmAction.value.type === 'leave' && confirmAction.value.calendar) {
+    success = await leaveCalendar(confirmAction.value.calendar)
+  } else {
+    success = await deleteCalendar(confirmAction.value.calendarHref)
+  }
+
   if (success) {
-    // Reload events to remove events from deleted calendar
+    // Reload events to remove events from deleted/left calendar
     await loadEventsForCurrentRange()
   }
-  confirmDelete.value = null
+  confirmAction.value = null
 }
 
-function cancelCalendarDeletion() {
-  confirmDelete.value = null
+function cancelCalendarAction() {
+  confirmAction.value = null
 }
 
 async function handleCalendarSaved() {
@@ -248,6 +259,7 @@ async function handleImported() {
       <CalendarSidebar
         :calendars="calendars"
         :pending-shares="pendingShares"
+        :user-profiles="userProfiles"
         :loading="calendarsLoading"
         :is-open="sidebarOpen"
         @toggle="handleToggleCalendar"
@@ -297,13 +309,15 @@ async function handleImported() {
     />
 
     <ConfirmDialog
-      :is-open="confirmDelete?.isOpen || false"
-      :title="t('Delete Calendar')"
-      :message="t(`Are you sure you want to delete '%{name}'? All events in this calendar will be permanently deleted.`, { name: confirmDelete?.calendarName || '' })"
-      :confirm-text="t('Delete')"
+      :is-open="confirmAction?.isOpen || false"
+      :title="confirmAction?.type === 'leave' ? t('Leave Calendar') : t('Delete Calendar')"
+      :message="confirmAction?.type === 'leave' 
+        ? t(`Are you sure you want to leave '%{name}'? You will no longer have access to this calendar.`, { name: confirmAction?.calendarName || '' })
+        : t(`Are you sure you want to delete '%{name}'? All events in this calendar will be permanently deleted.`, { name: confirmAction?.calendarName || '' })"
+      :confirm-text="confirmAction?.type === 'leave' ? t('Leave') : t('Delete')"
       :confirm-danger="true"
-      @confirm="confirmCalendarDeletion"
-      @cancel="cancelCalendarDeletion"
+      @confirm="confirmCalendarAction"
+      @cancel="cancelCalendarAction"
     />
   </div>
 </template>

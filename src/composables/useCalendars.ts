@@ -22,32 +22,50 @@ export function useCalendars() {
     error.value = null
 
     try {
+      const currentUserId = await waitForUserId()
+      if (!currentUserId) throw new Error('User not authenticated')
+      const normalizedCurrentUserId = currentUserId.toLowerCase().trim()
+
       // Store calendar home URL for later use (calendar creation)
       const principal = await discoverUserPrincipal()
       const home = await discoverCalendarHome(principal)
       calendarHomeUrl.value = home
 
-      calendars.value = await client.discoverCalendars()
+      const discovered = await client.discoverCalendars()
+      const allShares = await client.listShares('all')
 
-      await loadPendingShares()
-    } catch (err) {
-      error.value = err instanceof Error ? err : new Error('Failed to load calendars')
-      console.error('Failed to load calendars:', err)
-    } finally {
-      loading.value = false
-    }
-  }
+      // Process discovered calendars and identify shared ones
+      calendars.value = discovered.map(cal => {
+        // Radicale calendars in 'all' list have PathOrToken starting with / recipientId /
+        // We match them by comparing the trailing part of the href with PathOrToken
+        const calPath = cal.href.startsWith('/caldav/') ? cal.href.slice(7) : cal.href
 
-  async function loadPendingShares() {
-    try {
-      const currentUserId = await waitForUserId()
-      if (!currentUserId) return
+        const matchingShare = allShares.find(s =>
+          s.PathOrToken === calPath ||
+          s.PathOrToken === `/${calPath}` ||
+          calPath === `/${s.PathOrToken}` ||
+          calPath.endsWith(s.PathOrToken)
+        )
 
-      const shares = await client.listShares('all')
-      const normalizedCurrentUserId = currentUserId.toLowerCase().trim()
+        if (matchingShare && matchingShare.Owner.toLowerCase().trim() !== normalizedCurrentUserId) {
+          // It's a shared calendar owned by someone else
+          loadUserProfile(matchingShare.Owner)
+          return {
+            ...cal,
+            isShared: true,
+            owner: matchingShare.Owner,
+            sharePathOrToken: matchingShare.PathOrToken
+          }
+        }
+        return cal
+      })
 
-      pendingShares.value = shares.filter(
+      // Identify pending invitations (exclude those owned by the current user)
+      pendingShares.value = allShares.filter(
         share => {
+          const normalizedOwner = share.Owner.toLowerCase().trim()
+          if (normalizedOwner === normalizedCurrentUserId) return false
+
           // If explicitly shared with this user
           if (share.User) {
             const normalizedShareUser = share.User.toLowerCase().trim()
@@ -56,13 +74,11 @@ export function useCalendars() {
             }
           }
 
-          // Radicale sometimes doesn't set 'User' on 'all' list for the recipient
-          // but we can identify it if PathOrToken contains our userId and it's not owned by us
+          // Fallback discovery via path
           const pathOrToken = share.PathOrToken.toLowerCase()
           const isOurPath = pathOrToken.includes(`/${normalizedCurrentUserId}/`)
-          const isNotOurOwn = share.Owner.toLowerCase().trim() !== normalizedCurrentUserId
 
-          if (isOurPath && isNotOurOwn) {
+          if (isOurPath) {
             return !share.EnabledByUser || share.HiddenByUser
           }
 
@@ -77,15 +93,22 @@ export function useCalendars() {
         }
       }
     } catch (err) {
-      console.warn('Failed to load pending shares:', err)
+      error.value = err instanceof Error ? err : new Error('Failed to load calendars')
+      console.error('Failed to load calendars:', err)
+    } finally {
+      loading.value = false
     }
+  }
+
+  async function loadPendingShares() {
+    await loadCalendars()
   }
 
   function startPolling() {
     if (pollInterval) return
-    // Poll for new invitations every 30 seconds
+    // Poll for new invitations and calendar updates every 30 seconds
     pollInterval = setInterval(() => {
-      loadPendingShares()
+      loadCalendars()
     }, 30000)
   }
 
@@ -125,10 +148,28 @@ export function useCalendars() {
     loading.value = true
     try {
       await client.deleteShare('map', share.PathOrToken)
-      await loadPendingShares()
+      await loadCalendars()
     } catch (err) {
       console.error('Failed to decline share:', err)
       error.value = err instanceof Error ? err : new Error('Failed to decline share')
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function leaveCalendar(calendar: Calendar) {
+    if (!calendar.isShared) return false
+
+    loading.value = true
+    try {
+      // In Radicale, the recipient "leaves" by deleting their mapping resource
+      await client.deleteCalendar(calendar.href)
+      await loadCalendars()
+      return true
+    } catch (err) {
+      console.error('Failed to leave calendar:', err)
+      error.value = err instanceof Error ? err : new Error('Failed to leave calendar')
+      return false
     } finally {
       loading.value = false
     }
@@ -185,6 +226,7 @@ export function useCalendars() {
     loadPendingShares,
     acceptShare,
     declineShare,
+    leaveCalendar,
     toggleCalendarVisibility,
     setCalendarVisibility,
     getCalendarByHref,
