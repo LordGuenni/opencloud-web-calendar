@@ -28,12 +28,15 @@ jobs:
       - run: pnpm build
 
       - name: Create release archive
-        run: cd dist && zip -r ../web-app-calendar.zip .
+        run: |
+          mkdir web-calendar
+          cp -r dist/* web-calendar/
+          zip -r web-calendar.zip web-calendar
 
       - uses: actions/upload-artifact@v7
         with:
-          name: web-app-calendar
-          path: web-app-calendar.zip
+          name: web-calendar
+          path: web-calendar.zip
 
   release:
     needs: build
@@ -42,9 +45,9 @@ jobs:
     steps:
       - uses: actions/download-artifact@v7
         with:
-          name: web-app-calendar
+          name: web-calendar
 
       - uses: softprops/action-gh-release@v3
         with:
-          files: web-app-calendar.zip
+          files: web-calendar.zip
           generate_release_notes: true
