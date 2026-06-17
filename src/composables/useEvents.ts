@@ -32,8 +32,9 @@ export function useEvents() {
   }
 
   function getVisibleEvents(calendars: Calendar[]): CalendarEvent[] {
-    const visibleHrefs = new Set(calendars.filter((c) => c.visible).map((c) => c.href))
-    return events.value.filter((e) => visibleHrefs.has(e.calendarHref))
+    const normalize = (href: string) => (href.endsWith('/') ? href : href + '/')
+    const visibleHrefs = new Set(calendars.filter((c) => c.visible).map((c) => normalize(c.href)))
+    return events.value.filter((e) => visibleHrefs.has(normalize(e.calendarHref)))
   }
 
   function addEvent(event: CalendarEvent): void {

@@ -86,6 +86,14 @@ onMounted(async () => {
 })
 
 watch(
+  () => calendars.value.map((c) => c.href).join(','),
+  () => {
+    // When the list of calendars changes (e.g. shared calendars loaded), re-fetch events
+    loadEventsForCurrentRange()
+  }
+)
+
+watch(
   () => calendars.value.map((c) => c.visible).join(','),
   () => {
     // Visibility changed, events will be filtered by visibleEvents computed

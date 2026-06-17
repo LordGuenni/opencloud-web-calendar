@@ -48,7 +48,7 @@ export function useUserProfiles() {
       }
 
       // Fallback: search by ID/username
-      const searchUrl = `${origin}/graph/v1.0/users?$search=${encodeURIComponent(cleanedId)}`
+      const searchUrl = `${origin}/graph/v1.0/users?$search=${encodeURIComponent('"' + cleanedId + '"')}`
       const searchResponse = await fetch(searchUrl, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -82,7 +82,7 @@ export function useUserProfiles() {
     if (!token) throw new Error('Not authenticated')
 
     const origin = typeof window !== 'undefined' && window.location?.origin ? window.location.origin : ''
-    const url = `${origin}/graph/v1.0/users?$search=${encodeURIComponent(userIdOrEmail)}`
+    const url = `${origin}/graph/v1.0/users?$search=${encodeURIComponent('"' + userIdOrEmail + '"')}`
 
     const response = await fetch(url, {
       headers: {

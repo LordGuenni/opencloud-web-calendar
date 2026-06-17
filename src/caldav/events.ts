@@ -37,7 +37,13 @@ export async function fetchEvents(
 
   const events: CalendarEvent[] = []
   for (const data of eventData) {
-    const parsed = parseICS(data.calendarData, data.href, data.etag, range)
+    // Reconstruct href using the requested calendarHref to ensure shared mapped paths are preserved
+    const filename = data.href.substring(data.href.lastIndexOf('/') + 1)
+    const fixedHref = calendarHref.endsWith('/')
+      ? `${calendarHref}${filename}`
+      : `${calendarHref}/${filename}`
+
+    const parsed = parseICS(data.calendarData, fixedHref, data.etag, range)
     events.push(...parsed)
   }
 

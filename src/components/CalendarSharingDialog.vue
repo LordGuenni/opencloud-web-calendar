@@ -142,7 +142,7 @@ function getShareUrl(token: string) {
                       {{ t('Accepted') }}
                     </span>
                     <span
-                      v-else-if="!share.EnabledByUser && !share.HiddenByUser"
+                      v-else-if="!share.EnabledByUser && share.HiddenByUser"
                       class="ext:px-1.5 ext:py-0.5 ext:text-[10px] ext:font-medium ext:bg-yellow-100 ext:text-yellow-700 ext:rounded"
                     >
                       {{ t('Invited') }}

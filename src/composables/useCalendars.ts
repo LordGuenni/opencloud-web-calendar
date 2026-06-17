@@ -35,17 +35,22 @@ export function useCalendars() {
       const allShares = await client.listShares('all')
 
       // Process discovered calendars and identify shared ones
-      calendars.value = (discovered.map(cal => {
-        // Radicale calendars in 'all' list have PathOrToken starting with / recipientId /
-        // We match them by comparing the trailing part of the href with PathOrToken
-        const calPath = cal.href.startsWith('/caldav/') ? cal.href.slice(7) : cal.href
+      const normalize = (path: string) => {
+        let p = path.startsWith('/caldav/') ? path.slice(7) : path
+        return p.endsWith('/') ? p : p + '/'
+      }
 
-        const matchingShare = allShares.find(s =>
-          s.PathOrToken === calPath ||
-          s.PathOrToken === `/${calPath}` ||
-          calPath === `/${s.PathOrToken}` ||
-          calPath.endsWith(s.PathOrToken)
-        )
+      calendars.value = (discovered.map(cal => {
+        const calPath = normalize(cal.href)
+
+        const matchingShare = allShares.find(s => {
+          const sharePath = normalize(s.PathOrToken)
+          return (
+            sharePath === calPath ||
+            calPath.endsWith(sharePath) ||
+            sharePath.endsWith(calPath)
+          )
+        })
 
         const ownerId = matchingShare ? cleanUserId(matchingShare.Owner) : null
         if (matchingShare && ownerId && ownerId.toLowerCase().trim() !== normalizedCurrentUserId) {
@@ -65,6 +70,36 @@ export function useCalendars() {
         }
         return cal
       }).filter(Boolean) as Calendar[])
+
+      // Add fallback for enabled shared calendars that were not found by discovery
+      const discoveredHrefs = new Set(calendars.value.map((c) => normalize(c.href)))
+
+      for (const share of allShares) {
+        const ownerId = cleanUserId(share.Owner)
+        if (ownerId.toLowerCase().trim() === normalizedCurrentUserId) continue
+
+        if (share.EnabledByUser && !share.HiddenByUser && share.EnabledByOwner) {
+          const sharePath = normalize(share.PathOrToken)
+          if (!discoveredHrefs.has(sharePath)) {
+            // This is an enabled share that discovery missed
+            loadUserProfile(ownerId)
+            calendars.value.push({
+              href: `/caldav/${sharePath}`,
+              displayName:
+                share.PathOrToken.split('/').filter(Boolean).pop()?.replace('-shared', '') ||
+                'Shared Calendar',
+              color: '#3788d8', // Default color
+              ctag: '',
+              visible: true,
+              isShared: true,
+              owner: ownerId,
+              sharePathOrToken: share.PathOrToken,
+              readOnly: share.Permissions === 'r'
+            })
+            discoveredHrefs.add(sharePath)
+          }
+        }
+      }
 
       // Identify pending invitations
       pendingShares.value = allShares.filter(
