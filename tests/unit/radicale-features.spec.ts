@@ -9,7 +9,14 @@ import {
   buildJournalQuery,
   buildFreeBusyQuery
 } from '../../src/caldav/xml-builder'
-import { parseAddressBooks, parseAddressData } from '../../src/caldav/xml-parser'
+import {
+  parseAddressBooks,
+  parseAddressData,
+  parseCalendars,
+  parseCalendarHomeSet,
+  parseCurrentUserPrincipal,
+  parseEvents
+} from '../../src/caldav/xml-parser'
 
 describe('Radicale VTODO support', () => {
   it('generates, parses, and losslessly updates VTODO items', () => {
@@ -200,5 +207,77 @@ describe('CalDAV & CardDAV XML builders/parsers', () => {
     expect(contacts).toHaveLength(1)
     expect(contacts[0].etag).toBe('abc123')
     expect(contacts[0].addressData).toContain('FN:Alice')
+  })
+
+  it('parses CalDAV principal, calendar-home, calendars, and events XML with entities', () => {
+    const principalXml = `<?xml version="1.0"?>
+<d:multistatus xmlns:d="DAV:">
+  <d:response>
+    <d:href>/caldav/</d:href>
+    <d:propstat>
+      <d:prop><d:current-user-principal><d:href>/caldav/alice/</d:href></d:current-user-principal></d:prop>
+      <d:status>HTTP/1.1 200 OK</d:status>
+    </d:propstat>
+  </d:response>
+</d:multistatus>`
+    expect(parseCurrentUserPrincipal(principalXml)).toBe('/caldav/alice/')
+
+    const homeXml = `<?xml version="1.0"?>
+<d:multistatus xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
+  <d:response>
+    <d:href>/caldav/alice/</d:href>
+    <d:propstat>
+      <d:prop><c:calendar-home-set><d:href>/caldav/alice/</d:href></c:calendar-home-set></d:prop>
+      <d:status>HTTP/1.1 200 OK</d:status>
+    </d:propstat>
+  </d:response>
+</d:multistatus>`
+    expect(parseCalendarHomeSet(homeXml)).toBe('/caldav/alice/')
+
+    const calendarsXml = `<?xml version="1.0"?>
+<d:multistatus xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav" xmlns:ic="http://apple.com/ns/ical/" xmlns:cs="http://calendarserver.org/ns/">
+  <d:response>
+    <d:href>/caldav/alice/work/</d:href>
+    <d:propstat>
+      <d:prop>
+        <d:resourcetype><d:collection/><c:calendar/></d:resourcetype>
+        <d:displayname>Work &amp; Team</d:displayname>
+        <ic:calendar-color>#3788d8ff</ic:calendar-color>
+        <cs:getctag>ctag-42</cs:getctag>
+        <d:current-user-privilege-set><d:privilege><d:read/></d:privilege></d:current-user-privilege-set>
+      </d:prop>
+      <d:status>HTTP/1.1 200 OK</d:status>
+    </d:propstat>
+  </d:response>
+</d:multistatus>`
+    const cals = parseCalendars(calendarsXml)
+    expect(cals).toHaveLength(1)
+    expect(cals[0].displayName).toBe('Work & Team')
+    expect(cals[0].ctag).toBe('ctag-42')
+    expect(cals[0].readOnly).toBe(true)
+
+    const eventsXml = `<?xml version="1.0"?>
+<d:multistatus xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
+  <d:response>
+    <d:href>/caldav/alice/work/ev1.ics</d:href>
+    <d:propstat>
+      <d:prop>
+        <d:getetag>"etag-99"</d:getetag>
+        <c:calendar-data>BEGIN:VCALENDAR&#13;
+VERSION:2.0&#13;
+BEGIN:VEVENT&#13;
+UID:ev1&#13;
+SUMMARY:Q&amp;A Session&#13;
+END:VEVENT&#13;
+END:VCALENDAR</c:calendar-data>
+      </d:prop>
+      <d:status>HTTP/1.1 200 OK</d:status>
+    </d:propstat>
+  </d:response>
+</d:multistatus>`
+    const evs = parseEvents(eventsXml)
+    expect(evs).toHaveLength(1)
+    expect(evs[0].etag).toBe('etag-99')
+    expect(evs[0].calendarData).toContain('SUMMARY:Q&A Session')
   })
 })
