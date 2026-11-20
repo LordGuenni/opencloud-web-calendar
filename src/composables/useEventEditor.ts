@@ -28,7 +28,14 @@ function createEmptyFormData(calendarHref: string): EventFormData {
     end,
     allDay: false,
     description: '',
-    location: ''
+    location: '',
+    url: '',
+    categories: [],
+    status: 'CONFIRMED',
+    transp: 'OPAQUE',
+    classification: 'PUBLIC',
+    timezone: '',
+    alarms: []
   }
 }
 
@@ -46,8 +53,8 @@ export function useEventEditor() {
 
     const data = createEmptyFormData(calendarHref)
     if (startDate) {
-      data.start = startDate
-      data.end = endDate || new Date(startDate.getTime() + 3600000)
+      data.start = new Date(startDate)
+      data.end = endDate ? new Date(endDate) : new Date(startDate.getTime() + 3600000)
     }
     data.allDay = allDay
 
@@ -60,7 +67,6 @@ export function useEventEditor() {
     conflictData.value = null
     error.value = null
 
-    // If recurring, show scope dialog first
     if (event.isRecurring) {
       showScopeDialog.value = true
       editScope.value = null
@@ -81,7 +87,6 @@ export function useEventEditor() {
 
     populateFormFromEvent(editingEvent.value)
 
-    // For series edit, populate recurrence fields from RRULE
     if (scope === 'series' && editingEvent.value.rrule) {
       formData.value.recurrence = parseRRuleToFormData(editingEvent.value.rrule)
     }
@@ -104,7 +109,14 @@ export function useEventEditor() {
       end: new Date(event.end),
       allDay: event.allDay,
       description: event.description || '',
-      location: event.location || ''
+      location: event.location || '',
+      url: event.url || '',
+      categories: event.categories ? [...event.categories] : [],
+      status: event.status || 'CONFIRMED',
+      transp: event.transp || 'OPAQUE',
+      classification: event.classification || 'PUBLIC',
+      timezone: event.timezone || '',
+      alarms: event.alarms ? event.alarms.map((a) => ({ ...a })) : []
     }
   }
 
@@ -126,7 +138,6 @@ export function useEventEditor() {
 
       if (editingEvent.value) {
         if (editingEvent.value.isRecurring && editScope.value === 'single') {
-          // Edit single occurrence: add exception via RECURRENCE-ID
           await client.updateEventOccurrence(
             editingEvent.value,
             editingEvent.value.recurrenceId!,
@@ -135,12 +146,10 @@ export function useEventEditor() {
           close()
           return editingEvent.value
         } else if (editingEvent.value.isRecurring && editScope.value === 'series') {
-          // Edit entire series
           await client.updateEventSeries(editingEvent.value, formData.value)
           close()
           return editingEvent.value
         } else {
-          // Non-recurring event: normal update
           result = await client.updateEvent(editingEvent.value, formData.value)
         }
       } else {
@@ -174,13 +183,11 @@ export function useEventEditor() {
 
     try {
       if (editingEvent.value.isRecurring && editScope.value === 'single') {
-        // Delete single occurrence
         await client.deleteEventOccurrence(
           editingEvent.value,
           editingEvent.value.recurrenceId!
         )
       } else {
-        // Delete entire event/series
         await client.deleteEvent(editingEvent.value)
       }
       close()
@@ -198,7 +205,8 @@ export function useEventEditor() {
       if (editingEvent.value) {
         editingEvent.value = {
           ...editingEvent.value,
-          etag: conflictData.value.serverEvent.etag
+          etag: conflictData.value.serverEvent.etag,
+          icsData: conflictData.value.serverEvent.icsData
         }
       }
       conflictData.value = null
@@ -208,16 +216,7 @@ export function useEventEditor() {
   function resolveConflictUseServer(): void {
     if (conflictData.value) {
       const serverEvent = conflictData.value.serverEvent
-      formData.value = {
-        uid: serverEvent.uid,
-        calendarHref: serverEvent.calendarHref,
-        summary: serverEvent.summary,
-        start: new Date(serverEvent.start),
-        end: new Date(serverEvent.end),
-        allDay: serverEvent.allDay,
-        description: serverEvent.description || '',
-        location: serverEvent.location || ''
-      }
+      populateFormFromEvent(serverEvent)
       editingEvent.value = serverEvent
       conflictData.value = null
     }

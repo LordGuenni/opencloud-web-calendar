@@ -47,7 +47,7 @@ export function saveJoinedTokenCalendars(userId: string, records: JoinedCalendar
 export function addJoinedTokenCalendar(userId: string, record: JoinedCalendarRecord): void {
   const existing = getJoinedTokenCalendars(userId)
   const normalize = (t: string) => {
-    let p = t.startsWith('/caldav/') ? t.slice(7) : t
+    const p = t.startsWith('/caldav/') ? t.slice(7) : t
     return p.startsWith('/') ? p : `/${p}`
   }
   const target = normalize(record.token)
@@ -59,7 +59,7 @@ export function addJoinedTokenCalendar(userId: string, record: JoinedCalendarRec
 export function removeJoinedTokenCalendar(userId: string, token: string): void {
   const existing = getJoinedTokenCalendars(userId)
   const normalize = (t: string) => {
-    let p = t.startsWith('/caldav/') ? t.slice(7) : t
+    const p = t.startsWith('/caldav/') ? t.slice(7) : t
     return p.startsWith('/') ? p : `/${p}`
   }
   const target = normalize(token)
@@ -90,7 +90,7 @@ export function useCalendars() {
 
       // Process discovered calendars and identify shared ones
       const normalize = (path: string) => {
-        let p = path.startsWith('/caldav/') ? path.slice(7) : path
+        const p = path.startsWith('/caldav/') ? path.slice(7) : path
         return p.endsWith('/') ? p : p + '/'
       }
 

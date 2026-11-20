@@ -103,11 +103,13 @@ function normalizeCalDAVUrl(url: string): string {
     !(
       parsed.pathname === '/caldav' ||
       parsed.pathname.startsWith('/caldav/') ||
+      parsed.pathname === '/carddav' ||
+      parsed.pathname.startsWith('/carddav/') ||
       parsed.pathname.startsWith('/.sharing/') ||
       parsed.pathname.startsWith('/.token/')
     )
   ) {
-    throw new CalDAVError('Refusing request outside CalDAV endpoint')
+    throw new CalDAVError('Refusing request outside CalDAV/CardDAV endpoint')
   }
 
   return `${parsed.pathname}${parsed.search}${parsed.hash}`

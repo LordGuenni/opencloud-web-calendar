@@ -10,7 +10,7 @@ const emit = defineEmits<{
   saved: []
 }>()
 
-const { isOpen, formData, saving, error, close, save } = useCalendarEditor()
+const { isOpen, isEditing, formData, saving, error, close, save } = useCalendarEditor()
 
 // Preset colors matching common calendar apps
 const presetColors = [
@@ -46,7 +46,9 @@ function handleClose() {
       <div class="ext:bg-white ext:rounded-lg ext:shadow-xl ext:w-full ext:max-w-md ext:mx-4">
         <!-- Header -->
         <div class="ext:flex ext:items-center ext:justify-between ext:px-6 ext:py-4 ext:border-b">
-          <h2 class="ext:text-lg ext:font-semibold ext:text-gray-900">{{ t('New Calendar') }}</h2>
+          <h2 class="ext:text-lg ext:font-semibold ext:text-gray-900">
+            {{ isEditing ? t('Edit Calendar') : t('New Calendar') }}
+          </h2>
           <button
             type="button"
             class="ext:text-gray-500 hover:ext:text-gray-700"
@@ -105,7 +107,7 @@ function handleClose() {
             <label class="ext:block ext:text-sm ext:font-medium ext:text-gray-700 ext:mb-2">
               {{ t('Color') }}
             </label>
-            <div class="ext:grid ext:grid-cols-4 sm:ext:grid-cols-8 ext:gap-2">
+            <div class="ext:grid ext:grid-cols-4 sm:ext:grid-cols-8 ext:gap-2 ext:mb-3">
               <button
                 v-for="color in presetColors"
                 :key="color"
@@ -119,6 +121,18 @@ function handleClose() {
                 :style="{ backgroundColor: color }"
                 @click="formData.color = color"
               />
+            </div>
+            <div class="ext:flex ext:items-center ext:gap-2">
+              <label for="calendar-custom-color" class="ext:text-xs ext:text-gray-600">
+                {{ t('Custom color') }}:
+              </label>
+              <input
+                id="calendar-custom-color"
+                v-model="formData.color"
+                type="color"
+                class="ext:w-8 ext:h-7 ext:p-0 ext:border ext:border-gray-300 ext:rounded ext:cursor-pointer"
+              />
+              <span class="ext:text-xs ext:text-gray-500 ext:font-mono">{{ formData.color }}</span>
             </div>
           </div>
 
@@ -147,7 +161,15 @@ function handleClose() {
             :disabled="saving || !formData.displayName"
             @click="handleSave"
           >
-            {{ saving ? t('Creating...') : t('Create') }}
+            {{
+              saving
+                ? isEditing
+                  ? t('Saving...')
+                  : t('Creating...')
+                : isEditing
+                  ? t('Save')
+                  : t('Create')
+            }}
           </button>
         </div>
       </div>

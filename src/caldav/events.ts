@@ -1,7 +1,14 @@
 import { CalDAVError, AuthenticationError, NotFoundError, ConflictError } from './errors'
 import { buildCalendarQuery } from './xml-builder'
 import { parseEvents } from './xml-parser'
-import { parseICS, generateICS, generateUID, addExceptionToICS, updateSeriesICS } from './ics-utils'
+import {
+  parseICS,
+  generateICS,
+  updateEventICS,
+  generateUID,
+  addExceptionToICS,
+  updateSeriesICS
+} from './ics-utils'
 import { authenticatedFetch } from './auth'
 import type { CalendarEvent, EventFormData, DateRange } from '../types/calendar'
 
@@ -51,9 +58,12 @@ export async function fetchEvents(
 }
 
 export async function createEvent(formData: EventFormData): Promise<CalendarEvent> {
-  const uid = generateUID()
+  const uid = formData.uid || generateUID()
   const icsData = generateICS({ ...formData, uid })
-  const eventHref = `${formData.calendarHref}${uid}.ics`
+  const baseHref = formData.calendarHref.endsWith('/')
+    ? formData.calendarHref
+    : `${formData.calendarHref}/`
+  const eventHref = `${baseHref}${uid}.ics`
 
   const response = await authenticatedFetch(eventHref, {
     method: 'PUT',
@@ -75,10 +85,14 @@ export async function createEvent(formData: EventFormData): Promise<CalendarEven
   }
 
   const etag = response.headers.get('ETag')?.replace(/"/g, '') || ''
+  const parsed = parseICS(icsData, eventHref, etag)
+  if (parsed.length > 0) {
+    return parsed[0]
+  }
 
   return {
     uid,
-    calendarHref: formData.calendarHref,
+    calendarHref: baseHref,
     href: eventHref,
     etag,
     summary: formData.summary,
@@ -87,6 +101,13 @@ export async function createEvent(formData: EventFormData): Promise<CalendarEven
     allDay: formData.allDay,
     description: formData.description || undefined,
     location: formData.location || undefined,
+    url: formData.url || undefined,
+    categories: formData.categories,
+    status: formData.status,
+    transp: formData.transp,
+    classification: formData.classification,
+    timezone: formData.timezone,
+    alarms: formData.alarms,
     icsData,
     isRecurring: !!formData.recurrence,
     rrule: undefined
@@ -97,7 +118,19 @@ export async function updateEvent(
   event: CalendarEvent,
   formData: EventFormData
 ): Promise<CalendarEvent> {
-  const icsData = generateICS({ ...formData, uid: event.uid })
+  // Check if moving to a different calendar
+  const normalizeHref = (h: string) => (h.endsWith('/') ? h : `${h}/`)
+  if (
+    formData.calendarHref &&
+    normalizeHref(formData.calendarHref) !== normalizeHref(event.calendarHref)
+  ) {
+    return moveEvent(event, formData)
+  }
+
+  // Losslessly patch the existing ICS data to preserve unknown client properties
+  const icsData = event.icsData
+    ? updateEventICS(event.icsData, { ...formData, uid: event.uid })
+    : generateICS({ ...formData, uid: event.uid })
 
   const response = await authenticatedFetch(event.href, {
     method: 'PUT',
@@ -131,7 +164,68 @@ export async function updateEvent(
     allDay: formData.allDay,
     description: formData.description || undefined,
     location: formData.location || undefined,
+    url: formData.url || undefined,
+    categories: formData.categories,
+    status: formData.status,
+    transp: formData.transp,
+    classification: formData.classification,
+    timezone: formData.timezone,
+    alarms: formData.alarms,
     etag,
+    icsData,
+    isRecurring: !!formData.recurrence || event.isRecurring
+  }
+}
+
+export async function moveEvent(
+  event: CalendarEvent,
+  formData: EventFormData
+): Promise<CalendarEvent> {
+  const icsData = event.icsData
+    ? updateEventICS(event.icsData, { ...formData, uid: event.uid })
+    : generateICS({ ...formData, uid: event.uid })
+
+  const targetCal = formData.calendarHref.endsWith('/')
+    ? formData.calendarHref
+    : `${formData.calendarHref}/`
+  const newHref = `${targetCal}${encodeURIComponent(event.uid)}.ics`
+
+  const putResp = await authenticatedFetch(newHref, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'text/calendar; charset=utf-8'
+    },
+    body: icsData
+  })
+
+  if (putResp.status === 401) throw new AuthenticationError()
+  if (!putResp.ok && putResp.status !== 201 && putResp.status !== 204) {
+    throw new CalDAVError(`Failed to move event: ${putResp.statusText}`, putResp.status)
+  }
+
+  const newEtag = putResp.headers.get('ETag')?.replace(/"/g, '') || ''
+
+  // Delete from original calendar after successful PUT in destination
+  await deleteEvent(event)
+
+  return {
+    ...event,
+    calendarHref: targetCal,
+    href: newHref,
+    etag: newEtag,
+    summary: formData.summary,
+    start: formData.start,
+    end: formData.end,
+    allDay: formData.allDay,
+    description: formData.description || undefined,
+    location: formData.location || undefined,
+    url: formData.url || undefined,
+    categories: formData.categories,
+    status: formData.status,
+    transp: formData.transp,
+    classification: formData.classification,
+    timezone: formData.timezone,
+    alarms: formData.alarms,
     icsData,
     isRecurring: !!formData.recurrence || event.isRecurring
   }
@@ -209,6 +303,15 @@ export async function updateEventSeries(
   event: CalendarEvent,
   formData: EventFormData
 ): Promise<void> {
+  const normalizeHref = (h: string) => (h.endsWith('/') ? h : `${h}/`)
+  if (
+    formData.calendarHref &&
+    normalizeHref(formData.calendarHref) !== normalizeHref(event.calendarHref)
+  ) {
+    await moveEvent(event, formData)
+    return
+  }
+
   const updatedICS = updateSeriesICS(event.icsData, formData)
 
   const response = await authenticatedFetch(event.href, {

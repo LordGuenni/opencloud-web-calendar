@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import FullCalendar from '@fullcalendar/vue3'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
@@ -37,18 +37,27 @@ const calendarColorMap = computed(() => {
 
 const fullCalendarEvents = computed<EventInput[]>(() => {
   return props.events.map((event) => {
-    const calendar = props.calendars.find(c => c.href === event.calendarHref)
-    const isReadOnly = calendar?.readOnly || false
-    
+    const calendar = props.calendars.find((c) => c.href === event.calendarHref)
+    const isReadOnly = calendar?.readOnly || !!event.virtualType
+    const color =
+      event.virtualType === 'birthday'
+        ? '#ec4899'
+        : calendarColorMap.value.get(event.calendarHref) || '#3788d8'
+
+    const classNames: string[] = []
+    if (event.status === 'CANCELLED') classNames.push('oc-event-cancelled')
+    if (event.status === 'TENTATIVE') classNames.push('oc-event-tentative')
+
     return {
       id: event.recurrenceId ? `${event.uid}_${event.recurrenceId}` : event.uid,
       title: event.summary,
       start: event.start,
       end: event.end,
       allDay: event.allDay,
-      backgroundColor: calendarColorMap.value.get(event.calendarHref) || '#3788d8',
-      borderColor: calendarColorMap.value.get(event.calendarHref) || '#3788d8',
+      backgroundColor: color,
+      borderColor: color,
       editable: !isReadOnly,
+      classNames,
       extendedProps: {
         calendarEvent: event,
         isReadOnly
@@ -202,6 +211,17 @@ defineExpose({
 
 .fc-event {
   cursor: pointer;
+}
+
+.fc-event.oc-event-cancelled {
+  opacity: 0.55;
+  text-decoration: line-through;
+}
+
+.fc-event.oc-event-tentative {
+  opacity: 0.8;
+  border-style: dashed !important;
+  border-width: 2px !important;
 }
 
 .fc-daygrid-day-number {

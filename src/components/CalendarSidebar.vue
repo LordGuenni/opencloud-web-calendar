@@ -1,38 +1,56 @@
 <script setup lang="ts">
-import type { Calendar } from '../types/calendar'
+import MiniCalendar from './MiniCalendar.vue'
+import type { Calendar, CalendarEvent } from '../types/calendar'
 import type { Share } from '../caldav/client'
 import { t } from '../composables/useLanguage'
 
 defineProps<{
   calendars: readonly Calendar[]
+  events: readonly CalendarEvent[]
+  currentDate: Date
   pendingShares?: readonly Share[]
   userProfiles?: Record<string, string>
   loading: boolean
   isOpen: boolean
+  showTasksOnCalendar: boolean
+  showBirthdaysOnCalendar: boolean
+  hasContactsAvailable: boolean
 }>()
 
 const emit = defineEmits<{
   toggle: [calendarHref: string]
   create: []
+  edit: [calendar: Calendar]
+  export: [calendar: Calendar]
   delete: [calendarHref: string]
   share: [calendarHref: string]
   import: []
   acceptShare: [share: Share]
   declineShare: [share: Share]
   refresh: []
+  'select-date': [date: Date]
+  'update:showTasksOnCalendar': [val: boolean]
+  'update:showBirthdaysOnCalendar': [val: boolean]
 }>()
 </script>
 
 <template>
   <aside
     :class="[
-      'ext:w-56 sm:ext:w-64 ext:border-r ext:border-gray-200 ext:bg-gray-50 ext:overflow-y-auto ext:shrink-0',
+      'ext:w-60 sm:ext:w-64 ext:border-r ext:border-gray-200 ext:bg-gray-50 ext:overflow-y-auto ext:shrink-0',
       'ext:absolute ext:inset-y-0 ext:left-0 ext:z-20 ext:transition-transform ext:duration-200 ext:will-change-transform',
       'sm:ext:static sm:ext:z-auto sm:ext:transition-none sm:ext:shadow-none',
       isOpen ? 'ext:translate-x-0 ext:shadow-lg' : 'ext:-translate-x-full sm:ext:translate-x-0'
     ]"
   >
     <div class="ext:p-4">
+      <!-- Mini Calendar -->
+      <MiniCalendar
+        :current-date="currentDate"
+        :events="events"
+        @select-date="emit('select-date', $event)"
+      />
+
       <!-- Pending Shares Section -->
       <div v-if="pendingShares && pendingShares.length > 0" class="ext:mb-6">
         <h3 class="ext:text-xs ext:font-semibold ext:text-gray-500 ext:uppercase ext:tracking-wider ext:mb-2">
@@ -129,47 +147,72 @@ const emit = defineEmits<{
           :key="calendar.href"
           class="ext:group ext:flex ext:flex-col ext:gap-0.5"
         >
-          <div class="ext:flex ext:items-center ext:gap-2">
+          <div class="ext:flex ext:items-center ext:gap-1.5">
             <input
               :id="`cal-${calendar.href}`"
               type="checkbox"
               :checked="calendar.visible"
-              class="ext:w-4 ext:h-4 ext:rounded ext:border-gray-300"
+              class="ext:w-4 ext:h-4 ext:rounded ext:border-gray-300 ext:shrink-0"
               :style="{ accentColor: calendar.color }"
               @change="emit('toggle', calendar.href)"
             />
             <label
               :for="`cal-${calendar.href}`"
-              class="ext:flex ext:items-center ext:gap-2 ext:text-sm ext:text-gray-900 ext:cursor-pointer ext:flex-1"
+              class="ext:flex ext:items-center ext:gap-1.5 ext:text-sm ext:text-gray-900 ext:cursor-pointer ext:flex-1 ext:min-w-0"
             >
               <span
-                class="ext:w-3 ext:h-3 ext:rounded-full ext:flex-shrink-0"
+                class="ext:w-3 ext:h-3 ext:rounded-full ext:shrink-0"
                 :style="{ backgroundColor: calendar.color }"
               />
               <span class="ext:truncate">{{ calendar.displayName }}</span>
             </label>
-            <div class="ext:flex ext:items-center ext:gap-0.5">
+            <div class="ext:flex ext:items-center ext:gap-0.5 ext:shrink-0">
+              <!-- Edit calendar (PROPPATCH) -->
               <button
                 v-if="!calendar.readOnly && !calendar.isShared"
                 type="button"
-                class="ext:p-1 ext:text-gray-400 hover:ext:text-blue-600 ext:transition-colors ext:flex-shrink-0"
+                class="ext:p-0.5 ext:text-gray-400 hover:ext:text-blue-600 ext:transition-colors"
+                :title="t('Edit calendar')"
+                @click.stop="emit('edit', calendar)"
+              >
+                <svg class="ext:w-3.5 ext:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+              </button>
+              <!-- Export calendar (.ics) -->
+              <button
+                type="button"
+                class="ext:p-0.5 ext:text-gray-400 hover:ext:text-blue-600 ext:transition-colors"
+                :title="t('Export calendar (.ics)')"
+                @click.stop="emit('export', calendar)"
+              >
+                <svg class="ext:w-3.5 ext:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+              </button>
+              <!-- Share calendar -->
+              <button
+                v-if="!calendar.readOnly && !calendar.isShared"
+                type="button"
+                class="ext:p-0.5 ext:text-gray-400 hover:ext:text-blue-600 ext:transition-colors"
                 :title="t('Share calendar')"
                 @click.stop="emit('share', calendar.href)"
               >
-                <svg class="ext:w-4 ext:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="ext:w-3.5 ext:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                 </svg>
               </button>
+              <!-- Delete / Leave -->
               <button
                 type="button"
-                class="ext:p-1 ext:text-gray-400 hover:ext:text-red-600 ext:transition-colors ext:flex-shrink-0"
+                class="ext:p-0.5 ext:text-gray-400 hover:ext:text-red-600 ext:transition-colors"
                 :title="calendar.isShared ? t('Leave calendar') : t('Delete calendar')"
                 @click.stop="emit('delete', calendar.href)"
               >
-                <svg v-if="calendar.isShared" class="ext:w-4 ext:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg v-if="calendar.isShared" class="ext:w-3.5 ext:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                 </svg>
-                <svg v-else class="ext:w-4 ext:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg v-else class="ext:w-3.5 ext:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
                     stroke-linecap="round"
                     stroke-linejoin="round"
@@ -190,6 +233,36 @@ const emit = defineEmits<{
           </div>
         </li>
       </ul>
+
+      <!-- Overlays Section (Tasks due dates + Contact Birthdays) -->
+      <div class="ext:mt-6 ext:pt-4 ext:border-t ext:border-gray-200">
+        <h3 class="ext:text-xs ext:font-semibold ext:text-gray-500 ext:uppercase ext:tracking-wider ext:mb-2.5">
+          {{ t('Overlays') }}
+        </h3>
+        <div class="ext:space-y-2">
+          <label class="ext:flex ext:items-center ext:gap-2 ext:text-xs ext:text-gray-700 ext:cursor-pointer">
+            <input
+              type="checkbox"
+              :checked="showTasksOnCalendar"
+              class="ext:w-3.5 ext:h-3.5 ext:rounded ext:border-gray-300"
+              @change="emit('update:showTasksOnCalendar', ($event.target as HTMLInputElement).checked)"
+            />
+            <span>{{ t('Show tasks with due dates') }}</span>
+          </label>
+          <label
+            v-if="hasContactsAvailable"
+            class="ext:flex ext:items-center ext:gap-2 ext:text-xs ext:text-gray-700 ext:cursor-pointer"
+          >
+            <input
+              type="checkbox"
+              :checked="showBirthdaysOnCalendar"
+              class="ext:w-3.5 ext:h-3.5 ext:rounded ext:border-gray-300"
+              @change="emit('update:showBirthdaysOnCalendar', ($event.target as HTMLInputElement).checked)"
+            />
+            <span>{{ t('Show contact birthdays') }}</span>
+          </label>
+        </div>
+      </div>
     </div>
   </aside>
 </template>

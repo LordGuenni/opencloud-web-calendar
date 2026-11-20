@@ -1,7 +1,11 @@
 import ICAL from 'ical.js'
 import type {
   CalendarEvent,
+  EventAlarm,
+  EventClassification,
   EventFormData,
+  EventStatus,
+  EventTransp,
   DateRange,
   RecurrenceFormData
 } from '../types/calendar'
@@ -49,7 +53,6 @@ export function parseICS(
     const isRecurring = masterEvent.isRecurring()
 
     if (!isRecurring) {
-      // Simple non-recurring event
       const parsed = parseVevent(masterVevent, href, etag, calendarHref, icsData)
       return parsed ? [parsed] : []
     }
@@ -78,6 +81,7 @@ export function parseICS(
     const dtstart = masterVevent.getFirstPropertyValue('dtstart') as ICAL.Time
     if (!dtstart) return []
 
+    const masterMeta = extractEventMetadata(masterVevent)
     const duration = masterEvent.duration
 
     // Set expansion bounds
@@ -143,6 +147,7 @@ export function parseICS(
         allDay,
         description: masterEvent.description || undefined,
         location: masterEvent.location || undefined,
+        ...masterMeta,
         icsData,
         isRecurring: true,
         rrule: rruleStr,
@@ -155,6 +160,124 @@ export function parseICS(
     console.error('Failed to parse ICS:', e)
     return []
   }
+}
+
+function extractEventMetadata(vevent: ICAL.Component): {
+  url?: string
+  categories?: string[]
+  status?: EventStatus
+  transp?: EventTransp
+  classification?: EventClassification
+  timezone?: string
+  alarms?: EventAlarm[]
+} {
+  const urlVal = vevent.getFirstPropertyValue('url')
+  const url = typeof urlVal === 'string' && urlVal.trim() ? urlVal.trim() : undefined
+
+  const catProps = vevent.getAllProperties('categories')
+  const categorySet = new Set<string>()
+  for (const prop of catProps) {
+    const values = prop.getValues()
+    for (const v of values) {
+      if (typeof v === 'string') {
+        for (const part of v.split(',')) {
+          const trimmed = part.trim()
+          if (trimmed) categorySet.add(trimmed)
+        }
+      }
+    }
+  }
+  const categories = categorySet.size > 0 ? Array.from(categorySet) : undefined
+
+  const rawStatus = vevent.getFirstPropertyValue('status')
+  const statusStr = typeof rawStatus === 'string' ? rawStatus.toUpperCase() : undefined
+  const status: EventStatus | undefined =
+    statusStr === 'CONFIRMED' || statusStr === 'TENTATIVE' || statusStr === 'CANCELLED'
+      ? statusStr
+      : undefined
+
+  const rawTransp = vevent.getFirstPropertyValue('transp')
+  const transpStr = typeof rawTransp === 'string' ? rawTransp.toUpperCase() : undefined
+  const transp: EventTransp | undefined =
+    transpStr === 'OPAQUE' || transpStr === 'TRANSPARENT' ? transpStr : undefined
+
+  const rawClass = vevent.getFirstPropertyValue('class')
+  const classStr = typeof rawClass === 'string' ? rawClass.toUpperCase() : undefined
+  const classification: EventClassification | undefined =
+    classStr === 'PUBLIC' || classStr === 'PRIVATE' || classStr === 'CONFIDENTIAL'
+      ? classStr
+      : undefined
+
+  const dtstartProp = vevent.getFirstProperty('dtstart')
+  const tzidParam = dtstartProp?.getParameter('tzid')
+  const timezone = typeof tzidParam === 'string' && tzidParam.trim() ? tzidParam.trim() : undefined
+
+  const alarms = parseAlarms(vevent)
+
+  return {
+    url,
+    categories,
+    status,
+    transp,
+    classification,
+    timezone,
+    alarms: alarms.length > 0 ? alarms : undefined
+  }
+}
+
+export function parseAlarms(vevent: ICAL.Component): EventAlarm[] {
+  const alarms: EventAlarm[] = []
+  const valarms = vevent.getAllSubcomponents('valarm')
+
+  for (const valarm of valarms) {
+    const triggerProp = valarm.getFirstProperty('trigger')
+    if (!triggerProp) continue
+
+    const triggerVal = triggerProp.getFirstValue()
+    let minutes: number | null = null
+
+    if (triggerVal && typeof (triggerVal as ICAL.Duration).toSeconds === 'function') {
+      const secs = (triggerVal as ICAL.Duration).toSeconds()
+      // Negative duration means before start -> store as positive minutes before
+      minutes = Math.max(0, Math.round(-secs / 60))
+    } else if (typeof triggerVal === 'string') {
+      minutes = parseTriggerStringToMinutes(triggerVal)
+    }
+
+    if (minutes !== null) {
+      const descVal = valarm.getFirstPropertyValue('description')
+      alarms.push({
+        triggerMinutes: minutes,
+        description: typeof descVal === 'string' && descVal.trim() ? descVal.trim() : undefined
+      })
+    }
+  }
+
+  return alarms
+}
+
+function parseTriggerStringToMinutes(trigger: string): number | null {
+  const match = trigger.trim().match(/^(-?)P(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/i)
+  if (!match) return null
+  const [, sign, weeks, days, hours, mins, secs] = match
+  const totalMinutes =
+    (Number(weeks || 0) * 7 * 24 * 60) +
+    (Number(days || 0) * 24 * 60) +
+    (Number(hours || 0) * 60) +
+    Number(mins || 0) +
+    Math.round(Number(secs || 0) / 60)
+
+  // Only treat negative or zero triggers as "before start"
+  return sign === '-' || totalMinutes === 0 ? totalMinutes : 0
+}
+
+export function formatMinutesToTrigger(minutes: number): string {
+  const safe = Math.max(0, Math.round(minutes))
+  if (safe === 0) return 'PT0S'
+  if (safe % (7 * 24 * 60) === 0) return `-P${safe / (7 * 24 * 60)}W`
+  if (safe % (24 * 60) === 0) return `-P${safe / (24 * 60)}D`
+  if (safe % 60 === 0) return `-PT${safe / 60}H`
+  return `-PT${safe}M`
 }
 
 function parseVevent(
@@ -185,6 +308,7 @@ function parseVevent(
 
   const rruleProp = vevent.getFirstPropertyValue('rrule')
   const recIdProp = vevent.getFirstPropertyValue('recurrence-id') as ICAL.Time | null
+  const meta = extractEventMetadata(vevent)
 
   return {
     uid: event.uid,
@@ -197,6 +321,7 @@ function parseVevent(
     allDay,
     description: event.description || undefined,
     location: event.location || undefined,
+    ...meta,
     icsData,
     isRecurring: !!rruleProp || !!recIdProp,
     rrule: rruleProp ? rruleProp.toString() : undefined,
@@ -206,50 +331,219 @@ function parseVevent(
 
 export function generateICS(formData: EventFormData): string {
   const uid = formData.uid || generateUID()
-  const now = new Date()
-  const dtstamp = formatICALDateTime(now)
+  const comp = new ICAL.Component('vcalendar')
+  comp.addPropertyWithValue('version', '2.0')
+  comp.addPropertyWithValue('prodid', '-//OpenCloud//Calendar//EN')
 
-  let dtstart: string
-  let dtend: string
+  const vevent = new ICAL.Component('vevent')
+  vevent.addPropertyWithValue('uid', uid)
+  applyFormDataToVevent(vevent, formData, true)
 
-  if (formData.allDay) {
-    dtstart = `DTSTART;VALUE=DATE:${formatICALDate(formData.start)}`
-    dtend = `DTEND;VALUE=DATE:${formatICALDate(formData.end)}`
-  } else {
-    dtstart = `DTSTART:${formatICALDateTime(formData.start)}`
-    dtend = `DTEND:${formatICALDateTime(formData.end)}`
-  }
-
-  const lines = [
-    'BEGIN:VCALENDAR',
-    'VERSION:2.0',
-    'PRODID:-//OpenCloud//Calendar//EN',
-    'BEGIN:VEVENT',
-    `UID:${uid}`,
-    `DTSTAMP:${dtstamp}`,
-    dtstart,
-    dtend,
-    `SUMMARY:${escapeICALText(formData.summary)}`
-  ]
-
-  if (formData.recurrence) {
-    lines.push(`RRULE:${buildRRuleString(formData.recurrence, formData.allDay)}`)
-  }
-
-  if (formData.description) {
-    lines.push(`DESCRIPTION:${escapeICALText(formData.description)}`)
-  }
-
-  if (formData.location) {
-    lines.push(`LOCATION:${escapeICALText(formData.location)}`)
-  }
-
-  lines.push('END:VEVENT', 'END:VCALENDAR')
-
-  return lines.join('\r\n')
+  comp.addSubcomponent(vevent)
+  return comp.toString()
 }
 
-function buildRRuleString(rec: RecurrenceFormData, allDay: boolean): string {
+/**
+ * Losslessly patch an existing VEVENT inside an ICS document so that
+ * unknown properties (e.g. ATTENDEE, ORGANIZER, X-*, ATTACH) created by
+ * external CalDAV clients are preserved on edit.
+ */
+export function updateEventICS(icsData: string, formData: EventFormData): string {
+  try {
+    const jcalData = ICAL.parse(icsData)
+    const comp = new ICAL.Component(jcalData)
+    const vevents = comp.getAllSubcomponents('vevent')
+
+    let masterVevent: ICAL.Component | null = null
+    for (const vevent of vevents) {
+      if (!vevent.getFirstPropertyValue('recurrence-id')) {
+        masterVevent = vevent
+        break
+      }
+    }
+
+    if (!masterVevent) {
+      return generateICS(formData)
+    }
+
+    applyFormDataToVevent(masterVevent, formData, true)
+    return comp.toString()
+  } catch {
+    return generateICS(formData)
+  }
+}
+
+function applyFormDataToVevent(
+  vevent: ICAL.Component,
+  formData: EventFormData,
+  includeRRule: boolean
+): void {
+  vevent.updatePropertyWithValue('dtstamp', ICAL.Time.fromJSDate(new Date(), true))
+  vevent.updatePropertyWithValue('last-modified', ICAL.Time.fromJSDate(new Date(), true))
+  vevent.updatePropertyWithValue('summary', formData.summary)
+
+  // Start & End
+  vevent.removeAllProperties('dtstart')
+  vevent.removeAllProperties('dtend')
+  vevent.removeAllProperties('duration')
+
+  if (formData.allDay) {
+    const startTime = createICALDate(formData.start)
+    const endDate = new Date(formData.end)
+    // RFC 5545 all-day DTEND is exclusive; ensure at least +1 day after start
+    if (
+      endDate.getFullYear() === formData.start.getFullYear() &&
+      endDate.getMonth() === formData.start.getMonth() &&
+      endDate.getDate() === formData.start.getDate()
+    ) {
+      endDate.setDate(endDate.getDate() + 1)
+    }
+    const endTime = createICALDate(endDate)
+    const startProp = vevent.addPropertyWithValue('dtstart', startTime)
+    startProp.setParameter('value', 'DATE')
+    const endProp = vevent.addPropertyWithValue('dtend', endTime)
+    endProp.setParameter('value', 'DATE')
+  } else if (formData.timezone && formData.timezone !== 'UTC') {
+    const startTime = createICALDateTimeInTimeZone(formData.start, formData.timezone)
+    const endTime = createICALDateTimeInTimeZone(formData.end, formData.timezone)
+    const startProp = vevent.addPropertyWithValue('dtstart', startTime)
+    startProp.setParameter('tzid', formData.timezone)
+    const endProp = vevent.addPropertyWithValue('dtend', endTime)
+    endProp.setParameter('tzid', formData.timezone)
+  } else {
+    vevent.addPropertyWithValue('dtstart', ICAL.Time.fromJSDate(formData.start, true))
+    vevent.addPropertyWithValue('dtend', ICAL.Time.fromJSDate(formData.end, true))
+  }
+
+  // Description
+  if (formData.description) {
+    vevent.updatePropertyWithValue('description', formData.description)
+  } else {
+    vevent.removeAllProperties('description')
+  }
+
+  // Location
+  if (formData.location) {
+    vevent.updatePropertyWithValue('location', formData.location)
+  } else {
+    vevent.removeAllProperties('location')
+  }
+
+  // URL
+  if (formData.url && formData.url.trim()) {
+    vevent.updatePropertyWithValue('url', formData.url.trim())
+  } else {
+    vevent.removeAllProperties('url')
+  }
+
+  // Categories
+  vevent.removeAllProperties('categories')
+  const cleanedCategories = (formData.categories || []).map((c) => c.trim()).filter(Boolean)
+  if (cleanedCategories.length > 0) {
+    const catProp = new ICAL.Property('categories')
+    catProp.setValues(cleanedCategories)
+    vevent.addProperty(catProp)
+  }
+
+  // Status
+  if (formData.status) {
+    vevent.updatePropertyWithValue('status', formData.status)
+  } else {
+    vevent.removeAllProperties('status')
+  }
+
+  // Transparency (Busy/Free)
+  if (formData.transp) {
+    vevent.updatePropertyWithValue('transp', formData.transp)
+  } else {
+    vevent.removeAllProperties('transp')
+  }
+
+  // Classification (Public/Private/Confidential)
+  if (formData.classification) {
+    vevent.updatePropertyWithValue('class', formData.classification)
+  } else {
+    vevent.removeAllProperties('class')
+  }
+
+  // RRULE
+  if (includeRRule) {
+    vevent.removeAllProperties('rrule')
+    if (formData.recurrence) {
+      const rruleStr = buildRRuleString(formData.recurrence, formData.allDay)
+      vevent.addPropertyWithValue('rrule', ICAL.Recur.fromString(rruleStr))
+    }
+  }
+
+  // Alarms (VALARM)
+  const existingAlarms = vevent.getAllSubcomponents('valarm')
+  for (const existing of existingAlarms) {
+    vevent.removeSubcomponent(existing)
+  }
+  if (formData.alarms && formData.alarms.length > 0) {
+    for (const alarm of formData.alarms) {
+      const valarm = new ICAL.Component('valarm')
+      valarm.addPropertyWithValue('action', 'DISPLAY')
+      valarm.addPropertyWithValue(
+        'description',
+        alarm.description || formData.summary || 'Reminder'
+      )
+      const triggerDuration = ICAL.Duration.fromString(formatMinutesToTrigger(alarm.triggerMinutes))
+      valarm.addPropertyWithValue('trigger', triggerDuration)
+      vevent.addSubcomponent(valarm)
+    }
+  }
+}
+
+function createICALDate(date: Date): ICAL.Time {
+  return new ICAL.Time(
+    {
+      year: date.getFullYear(),
+      month: date.getMonth() + 1,
+      day: date.getDate(),
+      isDate: true
+    },
+    ICAL.Timezone.localTimezone
+  )
+}
+
+function createICALDateTimeInTimeZone(date: Date, timeZone: string): ICAL.Time {
+  try {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hourCycle: 'h23'
+    })
+    const parts = formatter.formatToParts(date)
+    const map: Record<string, number> = {}
+    for (const p of parts) {
+      if (p.type !== 'literal') {
+        map[p.type] = Number(p.value)
+      }
+    }
+    return new ICAL.Time(
+      {
+        year: map.year,
+        month: map.month,
+        day: map.day,
+        hour: map.hour === 24 ? 0 : map.hour,
+        minute: map.minute,
+        second: map.second,
+        isDate: false
+      },
+      ICAL.Timezone.localTimezone
+    )
+  } catch {
+    return ICAL.Time.fromJSDate(date, true)
+  }
+}
+
+export function buildRRuleString(rec: RecurrenceFormData, allDay: boolean): string {
   const parts: string[] = [`FREQ=${rec.frequency}`]
 
   if (rec.interval > 1) {
@@ -258,6 +552,15 @@ function buildRRuleString(rec: RecurrenceFormData, allDay: boolean): string {
 
   if (rec.frequency === 'WEEKLY' && rec.byDay && rec.byDay.length > 0) {
     parts.push(`BYDAY=${rec.byDay.join(',')}`)
+  }
+
+  if (
+    rec.frequency === 'MONTHLY' &&
+    rec.monthlyMode === 'dayOfWeek' &&
+    rec.monthlyWeekday &&
+    rec.monthlyPosition
+  ) {
+    parts.push(`BYDAY=${rec.monthlyPosition}${rec.monthlyWeekday}`)
   }
 
   if (rec.endType === 'count' && rec.count) {
@@ -295,11 +598,35 @@ export function parseRRuleToFormData(rruleStr: string): RecurrenceFormData {
   }
 
   let byDay: string[] | undefined
+  let monthlyMode: 'dayOfMonth' | 'dayOfWeek' | undefined
+  let monthlyWeekday: string | undefined
+  let monthlyPosition: number | undefined
+
   if (recur.parts && recur.parts.BYDAY) {
-    byDay = recur.parts.BYDAY as string[]
+    const rawByDay = recur.parts.BYDAY as string[]
+    if (frequency === 'MONTHLY' && rawByDay.length > 0) {
+      const m = String(rawByDay[0]).match(/^(-?\d+)?(MO|TU|WE|TH|FR|SA|SU)$/)
+      if (m) {
+        monthlyMode = 'dayOfWeek'
+        monthlyPosition = m[1] ? Number(m[1]) : (recur.parts.BYSETPOS?.[0] as number) || 1
+        monthlyWeekday = m[2]
+      }
+    } else {
+      byDay = rawByDay
+    }
   }
 
-  return { frequency, interval, endType, count, until, byDay }
+  return {
+    frequency,
+    interval,
+    endType,
+    count,
+    until,
+    byDay,
+    monthlyMode,
+    monthlyWeekday,
+    monthlyPosition
+  }
 }
 
 /**
@@ -315,7 +642,6 @@ export function addExceptionToICS(
   const comp = new ICAL.Component(jcalData)
   const vevents = comp.getAllSubcomponents('vevent')
 
-  // Find master event (one without RECURRENCE-ID)
   let masterVevent: ICAL.Component | null = null
   for (const vevent of vevents) {
     if (!vevent.getFirstPropertyValue('recurrence-id')) {
@@ -326,7 +652,6 @@ export function addExceptionToICS(
 
   if (!masterVevent) return icsData
 
-  // Parse the recurrence-id into an ICAL.Time
   const masterDtstart = masterVevent.getFirstPropertyValue('dtstart') as ICAL.Time
   const isDate = masterDtstart?.isDate || false
   const recIdTime = isDate
@@ -334,8 +659,6 @@ export function addExceptionToICS(
     : ICAL.Time.fromDateTimeString(recurrenceId)
 
   if (exceptionFormData) {
-    // Adding a modified occurrence: add EXDATE + new VEVENT with RECURRENCE-ID
-    // First, remove any existing exception for this recurrence-id
     const existingExceptions = comp.getAllSubcomponents('vevent')
     for (const exc of existingExceptions) {
       const excRecId = exc.getFirstPropertyValue('recurrence-id') as ICAL.Time | null
@@ -344,58 +667,18 @@ export function addExceptionToICS(
       }
     }
 
-    // Build exception VEVENT
     const excVevent = new ICAL.Component('vevent')
     const masterEvent = new ICAL.Event(masterVevent)
 
     excVevent.addPropertyWithValue('uid', masterEvent.uid)
-    excVevent.addPropertyWithValue(
-      'dtstamp',
-      ICAL.Time.fromJSDate(new Date(), false)
-    )
-
-    // Set RECURRENCE-ID
     const recIdProp = excVevent.addPropertyWithValue('recurrence-id', recIdTime)
     if (isDate) {
       recIdProp.setParameter('value', 'DATE')
     }
 
-    // Set start/end
-    if (exceptionFormData.allDay) {
-      const startProp = excVevent.addPropertyWithValue(
-        'dtstart',
-        ICAL.Time.fromJSDate(exceptionFormData.start, false)
-      )
-      startProp.setParameter('value', 'DATE')
-      ;(startProp.getFirstValue() as ICAL.Time).isDate = true
-      const endProp = excVevent.addPropertyWithValue(
-        'dtend',
-        ICAL.Time.fromJSDate(exceptionFormData.end, false)
-      )
-      endProp.setParameter('value', 'DATE')
-      ;(endProp.getFirstValue() as ICAL.Time).isDate = true
-    } else {
-      excVevent.addPropertyWithValue(
-        'dtstart',
-        ICAL.Time.fromJSDate(exceptionFormData.start, false)
-      )
-      excVevent.addPropertyWithValue(
-        'dtend',
-        ICAL.Time.fromJSDate(exceptionFormData.end, false)
-      )
-    }
-
-    excVevent.addPropertyWithValue('summary', exceptionFormData.summary)
-    if (exceptionFormData.description) {
-      excVevent.addPropertyWithValue('description', exceptionFormData.description)
-    }
-    if (exceptionFormData.location) {
-      excVevent.addPropertyWithValue('location', exceptionFormData.location)
-    }
-
+    applyFormDataToVevent(excVevent, exceptionFormData, false)
     comp.addSubcomponent(excVevent)
   } else {
-    // Deleting a single occurrence: just add EXDATE to master
     const exdateProp = masterVevent.addPropertyWithValue('exdate', recIdTime)
     if (isDate) {
       exdateProp.setParameter('value', 'DATE')
@@ -409,71 +692,7 @@ export function addExceptionToICS(
  * Update an existing ICS resource to modify the master (series) event properties.
  */
 export function updateSeriesICS(icsData: string, formData: EventFormData): string {
-  const jcalData = ICAL.parse(icsData)
-  const comp = new ICAL.Component(jcalData)
-  const vevents = comp.getAllSubcomponents('vevent')
-
-  // Find master event
-  let masterVevent: ICAL.Component | null = null
-  for (const vevent of vevents) {
-    if (!vevent.getFirstPropertyValue('recurrence-id')) {
-      masterVevent = vevent
-      break
-    }
-  }
-
-  if (!masterVevent) return icsData
-
-  // Update summary
-  masterVevent.updatePropertyWithValue('summary', formData.summary)
-
-  // Update description
-  if (formData.description) {
-    masterVevent.updatePropertyWithValue('description', formData.description)
-  } else {
-    masterVevent.removeAllProperties('description')
-  }
-
-  // Update location
-  if (formData.location) {
-    masterVevent.updatePropertyWithValue('location', formData.location)
-  } else {
-    masterVevent.removeAllProperties('location')
-  }
-
-  // Update start/end
-  if (formData.allDay) {
-    const startTime = ICAL.Time.fromJSDate(formData.start, false)
-    startTime.isDate = true
-    const endTime = ICAL.Time.fromJSDate(formData.end, false)
-    endTime.isDate = true
-    masterVevent.updatePropertyWithValue('dtstart', startTime)
-    masterVevent.updatePropertyWithValue('dtend', endTime)
-  } else {
-    masterVevent.updatePropertyWithValue(
-      'dtstart',
-      ICAL.Time.fromJSDate(formData.start, false)
-    )
-    masterVevent.updatePropertyWithValue(
-      'dtend',
-      ICAL.Time.fromJSDate(formData.end, false)
-    )
-  }
-
-  // Update RRULE
-  masterVevent.removeAllProperties('rrule')
-  if (formData.recurrence) {
-    const rruleStr = buildRRuleString(formData.recurrence, formData.allDay)
-    masterVevent.addPropertyWithValue('rrule', ICAL.Recur.fromString(rruleStr))
-  }
-
-  // Update DTSTAMP
-  masterVevent.updatePropertyWithValue(
-    'dtstamp',
-    ICAL.Time.fromJSDate(new Date(), false)
-  )
-
-  return comp.toString()
+  return updateEventICS(icsData, formData)
 }
 
 export function generateUID(): string {
@@ -491,8 +710,4 @@ function formatICALDate(date: Date): string {
   const month = String(date.getMonth() + 1).padStart(2, '0')
   const day = String(date.getDate()).padStart(2, '0')
   return `${year}${month}${day}`
-}
-
-function escapeICALText(text: string): string {
-  return text.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n')
 }

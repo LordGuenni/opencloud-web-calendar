@@ -1,7 +1,14 @@
 <script setup lang="ts">
-import { computed, watch, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useEventEditor } from '../composables/useEventEditor'
-import type { Calendar, RecurrenceFormData } from '../types/calendar'
+import type {
+  Calendar,
+  EventAlarm,
+  EventClassification,
+  EventStatus,
+  EventTransp,
+  RecurrenceFormData
+} from '../types/calendar'
 import { formatDateForInput, formatTimeForInput } from '../utils/date'
 import { t } from '../composables/useLanguage'
 import { generateICS } from '../caldav/ics-utils'
@@ -42,6 +49,63 @@ const {
   clearResults: clearLocationResults
 } = useLocationSearch()
 
+const showMoreOptions = ref(false)
+const categoryInput = ref('')
+
+const localTimeZone =
+  typeof Intl !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'UTC'
+
+const COMMON_TIMEZONES = Array.from(
+  new Set([
+    localTimeZone,
+    'UTC',
+    'Europe/Berlin',
+    'Europe/London',
+    'Europe/Paris',
+    'Europe/Zurich',
+    'Europe/Vienna',
+    'America/New_York',
+    'America/Chicago',
+    'America/Denver',
+    'America/Los_Angeles',
+    'Asia/Tokyo',
+    'Asia/Shanghai',
+    'Asia/Kolkata',
+    'Australia/Sydney'
+  ])
+)
+
+const ALARM_PRESETS = [
+  { minutes: 0, label: 'At time of event' },
+  { minutes: 5, label: '5 minutes before' },
+  { minutes: 15, label: '15 minutes before' },
+  { minutes: 30, label: '30 minutes before' },
+  { minutes: 60, label: '1 hour before' },
+  { minutes: 120, label: '2 hours before' },
+  { minutes: 1440, label: '1 day before' },
+  { minutes: 10080, label: '1 week before' }
+]
+
+const MONTHLY_POSITIONS = [
+  { value: 1, label: 'First' },
+  { value: 2, label: 'Second' },
+  { value: 3, label: 'Third' },
+  { value: 4, label: 'Fourth' },
+  { value: -1, label: 'Last' }
+]
+
+watch(isOpen, (open) => {
+  if (open) {
+    categoryInput.value = ''
+    showMoreOptions.value = Boolean(
+      formData.value.timezone ||
+        (formData.value.status && formData.value.status !== 'CONFIRMED') ||
+        (formData.value.transp && formData.value.transp !== 'OPAQUE') ||
+        (formData.value.classification && formData.value.classification !== 'PUBLIC')
+    )
+  }
+})
+
 function handleLocationInput(e: Event) {
   const query = (e.target as HTMLInputElement).value
   searchLocation(query)
@@ -53,7 +117,6 @@ function selectLocation(displayName: string) {
 }
 
 function handleLocationBlur() {
-  // Delay clearing results to allow click event on dropdown to fire
   setTimeout(() => {
     clearLocationResults()
   }, 200)
@@ -73,10 +136,17 @@ const hasRecurrence = computed({
   get: () => !!formData.value.recurrence,
   set: (val: boolean) => {
     if (val) {
+      const startDay = formData.value.start
+      const weekdayValues = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA']
+      const weekday = weekdayValues[startDay.getDay()]
+      const nth = Math.ceil(startDay.getDate() / 7)
       formData.value.recurrence = {
         frequency: 'WEEKLY',
         interval: 1,
-        endType: 'never'
+        endType: 'never',
+        monthlyMode: 'dayOfMonth',
+        monthlyWeekday: weekday,
+        monthlyPosition: nth > 4 ? -1 : nth
       }
     } else {
       formData.value.recurrence = undefined
@@ -98,6 +168,41 @@ const recurrenceInterval = computed({
   set: (val: number) => {
     if (formData.value.recurrence) {
       formData.value.recurrence = { ...formData.value.recurrence, interval: val }
+    }
+  }
+})
+
+const recurrenceMonthlyMode = computed({
+  get: () => formData.value.recurrence?.monthlyMode || 'dayOfMonth',
+  set: (val: 'dayOfMonth' | 'dayOfWeek') => {
+    if (formData.value.recurrence) {
+      const weekdayValues = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA']
+      const startDay = formData.value.start
+      formData.value.recurrence = {
+        ...formData.value.recurrence,
+        monthlyMode: val,
+        monthlyWeekday: formData.value.recurrence.monthlyWeekday || weekdayValues[startDay.getDay()],
+        monthlyPosition:
+          formData.value.recurrence.monthlyPosition || Math.min(4, Math.ceil(startDay.getDate() / 7))
+      }
+    }
+  }
+})
+
+const recurrenceMonthlyPosition = computed({
+  get: () => formData.value.recurrence?.monthlyPosition || 1,
+  set: (val: number) => {
+    if (formData.value.recurrence) {
+      formData.value.recurrence = { ...formData.value.recurrence, monthlyPosition: val }
+    }
+  }
+})
+
+const recurrenceMonthlyWeekday = computed({
+  get: () => formData.value.recurrence?.monthlyWeekday || 'MO',
+  set: (val: string) => {
+    if (formData.value.recurrence) {
+      formData.value.recurrence = { ...formData.value.recurrence, monthlyWeekday: val }
     }
   }
 })
@@ -127,19 +232,12 @@ const recurrenceUntil = computed({
   },
   set: (val: string) => {
     if (formData.value.recurrence && val) {
-      formData.value.recurrence = { ...formData.value.recurrence, until: new Date(val + 'T23:59:59') }
+      formData.value.recurrence = {
+        ...formData.value.recurrence,
+        until: new Date(val + 'T23:59:59')
+      }
     }
   }
-})
-
-const frequencyLabel = computed(() => {
-  const labels: Record<string, string> = {
-    DAILY: t('day(s)'),
-    WEEKLY: t('week(s)'),
-    MONTHLY: t('month(s)'),
-    YEARLY: t('year(s)')
-  }
-  return labels[recurrenceFrequency.value] || ''
 })
 
 function isWeekdaySelected(day: string): boolean {
@@ -149,10 +247,11 @@ function isWeekdaySelected(day: string): boolean {
 function toggleWeekday(day: string) {
   if (!formData.value.recurrence) return
   const current = formData.value.recurrence.byDay || []
-  const newDays = current.includes(day)
-    ? current.filter((d) => d !== day)
-    : [...current, day]
-  formData.value.recurrence = { ...formData.value.recurrence, byDay: newDays.length > 0 ? newDays : undefined }
+  const newDays = current.includes(day) ? current.filter((d) => d !== day) : [...current, day]
+  formData.value.recurrence = {
+    ...formData.value.recurrence,
+    byDay: newDays.length > 0 ? newDays : undefined
+  }
 }
 
 const startDate = computed({
@@ -211,6 +310,55 @@ const isReadOnly = computed(() => {
   return calendar?.readOnly || false
 })
 
+const canChangeCalendar = computed(() => {
+  return !isReadOnly.value && editScope.value !== 'single' && writableCalendars.value.length > 0
+})
+
+function addAlarm() {
+  if (!formData.value.alarms) formData.value.alarms = []
+  const existing = new Set(formData.value.alarms.map((a) => a.triggerMinutes))
+  const nextDefault = [15, 30, 60, 1440, 0].find((m) => !existing.has(m)) ?? 15
+  formData.value.alarms.push({ triggerMinutes: nextDefault })
+}
+
+function updateAlarmMinutes(index: number, minutes: number) {
+  if (!formData.value.alarms) return
+  const next: EventAlarm[] = formData.value.alarms.map((a, i) =>
+    i === index ? { ...a, triggerMinutes: minutes } : a
+  )
+  formData.value.alarms = next
+}
+
+function removeAlarm(index: number) {
+  if (!formData.value.alarms) return
+  formData.value.alarms = formData.value.alarms.filter((_, i) => i !== index)
+}
+
+function addCategory() {
+  const tag = categoryInput.value.trim()
+  if (!tag) return
+  if (!formData.value.categories) formData.value.categories = []
+  if (!formData.value.categories.includes(tag)) {
+    formData.value.categories = [...formData.value.categories, tag]
+  }
+  categoryInput.value = ''
+}
+
+function removeCategory(tag: string) {
+  formData.value.categories = (formData.value.categories || []).filter((c) => c !== tag)
+}
+
+const isValidHttpUrl = computed(() => {
+  const raw = formData.value.url?.trim()
+  if (!raw) return false
+  try {
+    const parsed = new URL(raw)
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+  } catch {
+    return false
+  }
+})
+
 async function handleSave() {
   if (isReadOnly.value) return
   const result = await save()
@@ -237,14 +385,12 @@ function handleExport() {
   let icsContent: string
 
   if (editScope.value === 'single') {
-    // Export only this occurrence as a standalone event (no RRULE)
     icsContent = generateICS({
       ...formData.value,
       uid: editingEvent.value.uid,
       recurrence: undefined
     })
   } else {
-    // Export full event or series using raw server ICS data
     icsContent = editingEvent.value.icsData
   }
 
@@ -259,6 +405,23 @@ function handleExport() {
   document.body.removeChild(a)
   URL.revokeObjectURL(url)
 }
+
+const statusOptions: Array<{ value: EventStatus; label: string }> = [
+  { value: 'CONFIRMED', label: 'Confirmed' },
+  { value: 'TENTATIVE', label: 'Tentative' },
+  { value: 'CANCELLED', label: 'Cancelled' }
+]
+
+const transpOptions: Array<{ value: EventTransp; label: string }> = [
+  { value: 'OPAQUE', label: 'Busy' },
+  { value: 'TRANSPARENT', label: 'Free' }
+]
+
+const classOptions: Array<{ value: EventClassification; label: string }> = [
+  { value: 'PUBLIC', label: 'Public' },
+  { value: 'PRIVATE', label: 'Private' },
+  { value: 'CONFIDENTIAL', label: 'Confidential' }
+]
 </script>
 
 <template>
@@ -337,6 +500,14 @@ function handleExport() {
           </button>
         </div>
 
+        <!-- Read-only Banner -->
+        <div
+          v-if="isReadOnly"
+          class="ext:px-6 ext:py-2.5 ext:bg-gray-100 ext:border-b ext:border-gray-200 ext:text-xs ext:text-gray-700 ext:shrink-0"
+        >
+          {{ t('This calendar is read-only. You cannot make changes.') }}
+        </div>
+
         <!-- Conflict Warning -->
         <div v-if="conflictData" class="ext:px-6 ext:py-4 ext:bg-yellow-50 ext:border-b ext:border-yellow-200 ext:shrink-0">
           <p class="ext:text-sm ext:text-yellow-800 ext:mb-3">
@@ -372,13 +543,14 @@ function handleExport() {
               v-model="formData.summary"
               type="text"
               required
-              class="ext:w-full ext:px-3 ext:py-2 ext:text-gray-900 ext:border ext:border-gray-300 ext:rounded ext:focus:ring-2 ext:focus:ring-blue-500 ext:focus:border-blue-500"
+              :disabled="isReadOnly"
+              class="ext:w-full ext:px-3 ext:py-2 ext:text-gray-900 ext:border ext:border-gray-300 ext:rounded ext:focus:ring-2 ext:focus:ring-blue-500 ext:focus:border-blue-500 disabled:ext:opacity-60"
               :placeholder="t('Event title')"
             />
           </div>
 
-          <!-- Calendar (only for new events) -->
-          <div v-if="!isEditing">
+          <!-- Calendar (create OR move between writable calendars) -->
+          <div v-if="canChangeCalendar">
             <label for="event-calendar" class="ext:block ext:text-sm ext:font-medium ext:text-gray-700 ext:mb-1">
               {{ t('Calendar') }}
             </label>
@@ -399,6 +571,7 @@ function handleExport() {
               id="event-allday"
               v-model="formData.allDay"
               type="checkbox"
+              :disabled="isReadOnly"
               class="ext:w-4 ext:h-4 ext:rounded ext:border-gray-300"
             />
             <label for="event-allday" class="ext:text-sm ext:font-medium ext:text-gray-900">
@@ -417,6 +590,7 @@ function handleExport() {
                 v-model="startDate"
                 type="date"
                 required
+                :disabled="isReadOnly"
                 class="ext:w-full ext:px-3 ext:py-2 ext:text-gray-900 ext:border ext:border-gray-300 ext:rounded ext:focus:ring-2 ext:focus:ring-blue-500"
               />
             </div>
@@ -429,6 +603,7 @@ function handleExport() {
                 v-model="startTime"
                 type="time"
                 required
+                :disabled="isReadOnly"
                 class="ext:w-full ext:px-3 ext:py-2 ext:text-gray-900 ext:border ext:border-gray-300 ext:rounded ext:focus:ring-2 ext:focus:ring-blue-500"
               />
             </div>
@@ -445,6 +620,7 @@ function handleExport() {
                 v-model="endDate"
                 type="date"
                 required
+                :disabled="isReadOnly"
                 class="ext:w-full ext:px-3 ext:py-2 ext:text-gray-900 ext:border ext:border-gray-300 ext:rounded ext:focus:ring-2 ext:focus:ring-blue-500"
               />
             </div>
@@ -457,6 +633,7 @@ function handleExport() {
                 v-model="endTime"
                 type="time"
                 required
+                :disabled="isReadOnly"
                 class="ext:w-full ext:px-3 ext:py-2 ext:text-gray-900 ext:border ext:border-gray-300 ext:rounded ext:focus:ring-2 ext:focus:ring-blue-500"
               />
             </div>
@@ -469,6 +646,7 @@ function handleExport() {
                 id="event-repeat"
                 v-model="hasRecurrence"
                 type="checkbox"
+                :disabled="isReadOnly"
                 class="ext:w-4 ext:h-4 ext:rounded ext:border-gray-300"
               />
               <label for="event-repeat" class="ext:text-sm ext:font-medium ext:text-gray-900">
@@ -485,10 +663,12 @@ function handleExport() {
                   type="number"
                   min="1"
                   max="99"
+                  :disabled="isReadOnly"
                   class="ext:w-16 ext:px-2 ext:py-1 ext:text-sm ext:text-gray-900 ext:border ext:border-gray-300 ext:rounded ext:focus:ring-2 ext:focus:ring-blue-500"
                 />
                 <select
                   v-model="recurrenceFrequency"
+                  :disabled="isReadOnly"
                   class="ext:px-2 ext:py-1 ext:text-sm ext:text-gray-900 ext:border ext:border-gray-300 ext:rounded ext:focus:ring-2 ext:focus:ring-blue-500"
                 >
                   <option value="DAILY">{{ t('day(s)') }}</option>
@@ -504,6 +684,7 @@ function handleExport() {
                   v-for="day in WEEKDAYS"
                   :key="day.value"
                   type="button"
+                  :disabled="isReadOnly"
                   class="ext:px-2 ext:py-1 ext:text-xs ext:rounded ext:border ext:transition-colors"
                   :class="isWeekdaySelected(day.value)
                     ? 'ext:bg-blue-600 ext:text-white ext:border-blue-600'
@@ -512,6 +693,54 @@ function handleExport() {
                 >
                   {{ t(day.label) }}
                 </button>
+              </div>
+
+              <!-- Monthly: day-of-month vs nth weekday -->
+              <div v-if="recurrenceFrequency === 'MONTHLY'" class="ext:space-y-2">
+                <div class="ext:flex ext:items-center ext:gap-2">
+                  <input
+                    id="monthly-dom"
+                    v-model="recurrenceMonthlyMode"
+                    type="radio"
+                    value="dayOfMonth"
+                    :disabled="isReadOnly"
+                    class="ext:w-4 ext:h-4"
+                  />
+                  <label for="monthly-dom" class="ext:text-xs ext:text-gray-900">
+                    {{ t('On the same day of month') }}
+                  </label>
+                </div>
+                <div class="ext:flex ext:items-center ext:gap-2 ext:flex-wrap">
+                  <input
+                    id="monthly-dow"
+                    v-model="recurrenceMonthlyMode"
+                    type="radio"
+                    value="dayOfWeek"
+                    :disabled="isReadOnly"
+                    class="ext:w-4 ext:h-4"
+                  />
+                  <label for="monthly-dow" class="ext:text-xs ext:text-gray-900">
+                    {{ t('On a specific weekday') }}:
+                  </label>
+                  <select
+                    v-model.number="recurrenceMonthlyPosition"
+                    :disabled="isReadOnly || recurrenceMonthlyMode !== 'dayOfWeek'"
+                    class="ext:px-2 ext:py-1 ext:text-xs ext:border ext:border-gray-300 ext:rounded disabled:ext:opacity-50"
+                  >
+                    <option v-for="pos in MONTHLY_POSITIONS" :key="pos.value" :value="pos.value">
+                      {{ t(pos.label) }}
+                    </option>
+                  </select>
+                  <select
+                    v-model="recurrenceMonthlyWeekday"
+                    :disabled="isReadOnly || recurrenceMonthlyMode !== 'dayOfWeek'"
+                    class="ext:px-2 ext:py-1 ext:text-xs ext:border ext:border-gray-300 ext:rounded disabled:ext:opacity-50"
+                  >
+                    <option v-for="day in WEEKDAYS" :key="day.value" :value="day.value">
+                      {{ t(day.label) }}
+                    </option>
+                  </select>
+                </div>
               </div>
 
               <!-- End condition -->
@@ -524,6 +753,7 @@ function handleExport() {
                     v-model="recurrenceEndType"
                     type="radio"
                     value="never"
+                    :disabled="isReadOnly"
                     class="ext:w-4 ext:h-4"
                   />
                   <label for="end-never" class="ext:text-sm ext:text-gray-900">{{ t('Never') }}</label>
@@ -535,6 +765,7 @@ function handleExport() {
                     v-model="recurrenceEndType"
                     type="radio"
                     value="count"
+                    :disabled="isReadOnly"
                     class="ext:w-4 ext:h-4"
                   />
                   <label for="end-count" class="ext:text-sm ext:text-gray-900">{{ t('After') }}</label>
@@ -543,7 +774,7 @@ function handleExport() {
                     type="number"
                     min="1"
                     max="999"
-                    :disabled="recurrenceEndType !== 'count'"
+                    :disabled="isReadOnly || recurrenceEndType !== 'count'"
                     class="ext:w-20 ext:px-2 ext:py-1 ext:text-sm ext:text-gray-900 ext:border ext:border-gray-300 ext:rounded disabled:ext:opacity-50"
                   />
                   <span class="ext:text-sm ext:text-gray-700">{{ t('occurrences') }}</span>
@@ -555,16 +786,64 @@ function handleExport() {
                     v-model="recurrenceEndType"
                     type="radio"
                     value="until"
+                    :disabled="isReadOnly"
                     class="ext:w-4 ext:h-4"
                   />
                   <label for="end-until" class="ext:text-sm ext:text-gray-900">{{ t('On') }}</label>
                   <input
                     v-model="recurrenceUntil"
                     type="date"
-                    :disabled="recurrenceEndType !== 'until'"
+                    :disabled="isReadOnly || recurrenceEndType !== 'until'"
                     class="ext:px-2 ext:py-1 ext:text-sm ext:text-gray-900 ext:border ext:border-gray-300 ext:rounded disabled:ext:opacity-50"
                   />
                 </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Reminders (VALARM) -->
+          <div>
+            <div class="ext:flex ext:items-center ext:justify-between ext:mb-1">
+              <label class="ext:text-sm ext:font-medium ext:text-gray-700">
+                {{ t('Reminders') }}
+              </label>
+              <button
+                v-if="!isReadOnly"
+                type="button"
+                class="ext:text-xs ext:text-blue-600 hover:ext:underline"
+                @click="addAlarm"
+              >
+                + {{ t('Add reminder') }}
+              </button>
+            </div>
+            <div v-if="formData.alarms && formData.alarms.length > 0" class="ext:space-y-1.5">
+              <div
+                v-for="(alarm, idx) in formData.alarms"
+                :key="idx"
+                class="ext:flex ext:items-center ext:gap-2"
+              >
+                <select
+                  :value="alarm.triggerMinutes"
+                  :disabled="isReadOnly"
+                  class="ext:flex-1 ext:px-2.5 ext:py-1.5 ext:text-sm ext:text-gray-900 ext:border ext:border-gray-300 ext:rounded"
+                  @change="updateAlarmMinutes(idx, Number(($event.target as HTMLSelectElement).value))"
+                >
+                  <option
+                    v-for="preset in ALARM_PRESETS"
+                    :key="preset.minutes"
+                    :value="preset.minutes"
+                  >
+                    {{ t(preset.label) }}
+                  </option>
+                </select>
+                <button
+                  v-if="!isReadOnly"
+                  type="button"
+                  class="ext:p-1 ext:text-gray-400 hover:ext:text-red-600"
+                  @click="removeAlarm(idx)"
+                >
+                  ×
+                </button>
               </div>
             </div>
           </div>
@@ -579,6 +858,7 @@ function handleExport() {
                 id="event-location"
                 v-model="formData.location"
                 type="text"
+                :disabled="isReadOnly"
                 class="ext:w-full ext:px-3 ext:py-2 ext:border ext:border-gray-300 ext:rounded ext:focus:ring-2 ext:focus:ring-blue-500"
                 :placeholder="t('Add location')"
                 @input="handleLocationInput"
@@ -609,6 +889,65 @@ function handleExport() {
             </div>
           </div>
 
+          <!-- Meeting URL / Link -->
+          <div>
+            <label for="event-url" class="ext:block ext:text-sm ext:font-medium ext:text-gray-700 ext:mb-1">
+              {{ t('Meeting URL / Link') }}
+            </label>
+            <div class="ext:flex ext:gap-2">
+              <input
+                id="event-url"
+                v-model="formData.url"
+                type="url"
+                :disabled="isReadOnly"
+                class="ext:flex-1 ext:px-3 ext:py-2 ext:text-sm ext:text-gray-900 ext:border ext:border-gray-300 ext:rounded ext:focus:ring-2 ext:focus:ring-blue-500"
+                :placeholder="t('https://...')"
+              />
+              <a
+                v-if="isValidHttpUrl"
+                :href="formData.url"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="ext:px-3 ext:py-2 ext:text-xs ext:font-medium ext:bg-blue-50 ext:text-blue-700 ext:border ext:border-blue-200 ext:rounded hover:ext:bg-blue-100 ext:flex ext:items-center ext:whitespace-nowrap"
+              >
+                {{ t('Open link') }}
+              </a>
+            </div>
+          </div>
+
+          <!-- Categories -->
+          <div>
+            <label for="event-categories" class="ext:block ext:text-sm ext:font-medium ext:text-gray-700 ext:mb-1">
+              {{ t('Categories') }}
+            </label>
+            <div v-if="formData.categories && formData.categories.length > 0" class="ext:flex ext:flex-wrap ext:gap-1.5 ext:mb-1.5">
+              <span
+                v-for="cat in formData.categories"
+                :key="cat"
+                class="ext:inline-flex ext:items-center ext:gap-1 ext:px-2 ext:py-0.5 ext:text-xs ext:bg-blue-100 ext:text-blue-700 ext:rounded-full"
+              >
+                #{{ cat }}
+                <button
+                  v-if="!isReadOnly"
+                  type="button"
+                  class="hover:ext:text-red-600"
+                  @click="removeCategory(cat)"
+                >
+                  ×
+                </button>
+              </span>
+            </div>
+            <input
+              v-if="!isReadOnly"
+              id="event-categories"
+              v-model="categoryInput"
+              type="text"
+              :placeholder="t('Add tag and press Enter')"
+              class="ext:w-full ext:px-3 ext:py-1.5 ext:text-sm ext:text-gray-900 ext:border ext:border-gray-300 ext:rounded"
+              @keydown.enter.prevent="addCategory"
+            />
+          </div>
+
           <!-- Description -->
           <div>
             <label for="event-description" class="ext:block ext:text-sm ext:font-medium ext:text-gray-700 ext:mb-1">
@@ -618,9 +957,88 @@ function handleExport() {
               id="event-description"
               v-model="formData.description"
               rows="3"
+              :disabled="isReadOnly"
               class="ext:w-full ext:px-3 ext:py-2 ext:text-gray-900 ext:border ext:border-gray-300 ext:rounded ext:focus:ring-2 ext:focus:ring-blue-500"
               :placeholder="t('Add description')"
             />
+          </div>
+
+          <!-- More Options (Timezone, Status, Availability, Visibility) -->
+          <div class="ext:border-t ext:border-gray-200 ext:pt-3">
+            <button
+              type="button"
+              class="ext:text-xs ext:font-medium ext:text-blue-600 hover:ext:underline"
+              @click="showMoreOptions = !showMoreOptions"
+            >
+              {{ showMoreOptions ? t('Fewer options') : t('More options') }}
+            </button>
+
+            <div v-if="showMoreOptions" class="ext:mt-3 ext:grid ext:grid-cols-1 sm:ext:grid-cols-2 ext:gap-3">
+              <div v-if="!formData.allDay">
+                <label for="event-timezone" class="ext:block ext:text-xs ext:font-medium ext:text-gray-700 ext:mb-1">
+                  {{ t('Timezone') }}
+                </label>
+                <select
+                  id="event-timezone"
+                  v-model="formData.timezone"
+                  :disabled="isReadOnly"
+                  class="ext:w-full ext:px-2.5 ext:py-1.5 ext:text-xs ext:text-gray-900 ext:border ext:border-gray-300 ext:rounded"
+                >
+                  <option value="">{{ t('Local time (UTC)') }}</option>
+                  <option v-for="tz in COMMON_TIMEZONES" :key="tz" :value="tz">
+                    {{ tz }}
+                  </option>
+                </select>
+              </div>
+
+              <div>
+                <label for="event-status" class="ext:block ext:text-xs ext:font-medium ext:text-gray-700 ext:mb-1">
+                  {{ t('Status') }}
+                </label>
+                <select
+                  id="event-status"
+                  v-model="formData.status"
+                  :disabled="isReadOnly"
+                  class="ext:w-full ext:px-2.5 ext:py-1.5 ext:text-xs ext:text-gray-900 ext:border ext:border-gray-300 ext:rounded"
+                >
+                  <option v-for="s in statusOptions" :key="s.value" :value="s.value">
+                    {{ t(s.label) }}
+                  </option>
+                </select>
+              </div>
+
+              <div>
+                <label for="event-transp" class="ext:block ext:text-xs ext:font-medium ext:text-gray-700 ext:mb-1">
+                  {{ t('Availability') }}
+                </label>
+                <select
+                  id="event-transp"
+                  v-model="formData.transp"
+                  :disabled="isReadOnly"
+                  class="ext:w-full ext:px-2.5 ext:py-1.5 ext:text-xs ext:text-gray-900 ext:border ext:border-gray-300 ext:rounded"
+                >
+                  <option v-for="opt in transpOptions" :key="opt.value" :value="opt.value">
+                    {{ t(opt.label) }}
+                  </option>
+                </select>
+              </div>
+
+              <div>
+                <label for="event-class" class="ext:block ext:text-xs ext:font-medium ext:text-gray-700 ext:mb-1">
+                  {{ t('Visibility') }}
+                </label>
+                <select
+                  id="event-class"
+                  v-model="formData.classification"
+                  :disabled="isReadOnly"
+                  class="ext:w-full ext:px-2.5 ext:py-1.5 ext:text-xs ext:text-gray-900 ext:border ext:border-gray-300 ext:rounded"
+                >
+                  <option v-for="opt in classOptions" :key="opt.value" :value="opt.value">
+                    {{ t(opt.label) }}
+                  </option>
+                </select>
+              </div>
+            </div>
           </div>
 
           <!-- Error -->
@@ -633,7 +1051,7 @@ function handleExport() {
         <div class="ext:flex ext:items-center ext:justify-between ext:px-6 ext:py-4 ext:border-t ext:bg-gray-50 ext:shrink-0">
           <div class="ext:flex ext:items-center ext:gap-2">
             <button
-              v-if="isEditing"
+              v-if="isEditing && !isReadOnly"
               type="button"
               class="ext:px-4 ext:py-2 ext:text-sm ext:text-red-600 hover:ext:text-red-800"
               :disabled="saving"
@@ -664,6 +1082,7 @@ function handleExport() {
               {{ t('Cancel') }}
             </button>
             <button
+              v-if="!isReadOnly"
               type="button"
               class="ext:px-4 ext:py-2 ext:text-sm ext:rounded"
               :class="(saving || !formData.summary || !formData.summary.trim()) ? 'ext:bg-gray-300 ext:text-gray-500 ext:cursor-not-allowed' : 'ext:bg-blue-600 ext:text-white hover:ext:bg-blue-700'"

@@ -153,6 +153,101 @@ export function parseEvents(xml: string): EventData[] {
   return events
 }
 
+export function parseAddressBookHomeSet(xml: string): string | null {
+  const responses = parseMultistatus(xml)
+  for (const response of responses) {
+    const propstat = Array.isArray(response.propstat) ? response.propstat[0] : response.propstat
+    const homeSet = propstat?.prop?.['addressbook-home-set'] as { href?: string } | undefined
+    if (homeSet?.href) {
+      return homeSet.href
+    }
+  }
+  return null
+}
+
+export interface AddressBookData {
+  href: string
+  displayName?: string
+  description?: string
+  ctag?: string
+}
+
+export function parseAddressBooks(xml: string): AddressBookData[] {
+  const responses = parseMultistatus(xml)
+  const books: AddressBookData[] = []
+
+  for (const response of responses) {
+    const href = response.href
+    if (!href) continue
+
+    const propstats = Array.isArray(response.propstat) ? response.propstat : [response.propstat]
+    let foundBook = false
+    let displayname: unknown
+    let description: unknown
+    let ctag: unknown
+
+    for (const propstat of propstats) {
+      if (!propstat?.prop) continue
+      if (propstat.status && !propstat.status.includes('200')) continue
+
+      const prop = propstat.prop
+      if (prop['resourcetype']) {
+        const rt = prop['resourcetype'] as Record<string, unknown>
+        if (rt && 'addressbook' in rt) {
+          foundBook = true
+        }
+      }
+      if (prop['displayname'] !== undefined) displayname = prop['displayname']
+      if (prop['addressbook-description'] !== undefined) description = prop['addressbook-description']
+      if (prop['getctag'] !== undefined) ctag = prop['getctag']
+    }
+
+    if (!foundBook) continue
+
+    books.push({
+      href,
+      displayName: extractString(displayname),
+      description: extractString(description),
+      ctag: extractString(ctag)
+    })
+  }
+
+  return books
+}
+
+export interface ContactData {
+  href: string
+  etag: string
+  addressData: string
+}
+
+export function parseAddressData(xml: string): ContactData[] {
+  const responses = parseMultistatus(xml)
+  const contacts: ContactData[] = []
+
+  for (const response of responses) {
+    const href = response.href
+    if (!href) continue
+
+    const propstat = Array.isArray(response.propstat) ? response.propstat[0] : response.propstat
+    const prop = propstat?.prop
+    if (!prop) continue
+
+    const etag = extractString(prop['getetag'])
+    const addressData = extractString(prop['address-data'])
+
+    if (etag && addressData) {
+      contacts.push({
+        href,
+        etag: etag.replace(/"/g, ''),
+        addressData
+      })
+    }
+  }
+
+  return contacts
+}
+
 function extractString(value: unknown): string | undefined {
   if (typeof value === 'string') return value
   if (typeof value === 'object' && value !== null && '#text' in value) {

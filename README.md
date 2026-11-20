@@ -122,7 +122,17 @@ Use an init container or ConfigMap to copy the extension files to `/var/lib/open
 - [pnpm](https://pnpm.io/installation) (see `packageManager` field in `package.json` for the exact version)
 - Docker and Docker Compose (for local dev server)
 
-### Setup
+### Build with Docker (no local Node/pnpm required)
+
+```bash
+# Build production bundle to dist/
+docker compose run --rm builder
+
+# Or watch mode during development
+docker compose run --rm builder-watch
+```
+
+### Setup (Host Node.js)
 
 ```bash
 pnpm install
@@ -137,7 +147,7 @@ docker compose up
 
 Then open `https://host.docker.internal:9200` (default credentials: `admin`/`admin`).
 
-### Build for Production
+### Build for Production (Host Node.js)
 
 ```bash
 pnpm build

@@ -6,15 +6,32 @@ export const translations = {
     // App
     'Web Calendar': 'Web Calendar',
 
-    // Navigation
+    // Navigation & Sections
     Today: 'Today',
     Month: 'Month',
     Week: 'Week',
     Day: 'Day',
+    Agenda: 'Agenda',
+    Year: 'Year',
+    Calendar: 'Calendar',
+    Tasks: 'Tasks',
+    Notes: 'Notes',
+    Contacts: 'Contacts',
+    'Toggle sidebar': 'Toggle sidebar',
+    'Search events...': 'Search events...',
+    'All categories': 'All categories',
+    'Clear search': 'Clear search',
+    'Free / Busy': 'Free / Busy',
+    'Enable notifications': 'Enable notifications',
+    'Notifications enabled': 'Notifications enabled',
+    'Notifications disabled': 'Notifications disabled',
+    'Keyboard shortcuts': 'Keyboard shortcuts',
 
     // Sidebar
     Calendars: 'Calendars',
     'Create new calendar': 'Create new calendar',
+    'Edit calendar': 'Edit calendar',
+    'Export calendar (.ics)': 'Export calendar (.ics)',
     'Loading calendars...': 'Loading calendars...',
     'No calendars found': 'No calendars found',
     'Delete calendar': 'Delete calendar',
@@ -23,12 +40,15 @@ export const translations = {
     'From:': 'From:',
     Accept: 'Accept',
     Decline: 'Decline',
+    Refresh: 'Refresh',
+    Overlays: 'Overlays',
+    'Show tasks with due dates': 'Show tasks with due dates',
+    'Show contact birthdays': 'Show contact birthdays',
 
     // Event Dialog
     'Edit Event': 'Edit Event',
     'New Event': 'New Event',
     Title: 'Title',
-    Calendar: 'Calendar',
     'All day event': 'All day event',
     'Start Date': 'Start Date',
     'Start Time': 'Start Time',
@@ -43,6 +63,38 @@ export const translations = {
     Cancel: 'Cancel',
     'Saving...': 'Saving...',
     Save: 'Save',
+    'This calendar is read-only. You cannot make changes.':
+      'This calendar is read-only. You cannot make changes.',
+    'Meeting URL / Link': 'Meeting URL / Link',
+    'https://...': 'https://...',
+    'Open link': 'Open link',
+    Categories: 'Categories',
+    'Add tag and press Enter': 'Add tag and press Enter',
+    Status: 'Status',
+    Confirmed: 'Confirmed',
+    Tentative: 'Tentative',
+    Cancelled: 'Cancelled',
+    Availability: 'Availability',
+    Busy: 'Busy',
+    Free: 'Free',
+    Visibility: 'Visibility',
+    Public: 'Public',
+    Private: 'Private',
+    Confidential: 'Confidential',
+    Timezone: 'Timezone',
+    'Local time (UTC)': 'Local time (UTC)',
+    Reminders: 'Reminders',
+    'Add reminder': 'Add reminder',
+    'At time of event': 'At time of event',
+    '5 minutes before': '5 minutes before',
+    '15 minutes before': '15 minutes before',
+    '30 minutes before': '30 minutes before',
+    '1 hour before': '1 hour before',
+    '2 hours before': '2 hours before',
+    '1 day before': '1 day before',
+    '1 week before': '1 week before',
+    'More options': 'More options',
+    'Fewer options': 'Fewer options',
 
     // Conflict Resolution
     'This event was modified by another client. Choose how to resolve:':
@@ -52,9 +104,11 @@ export const translations = {
 
     // Calendar Dialog
     'New Calendar': 'New Calendar',
+    'Edit Calendar': 'Edit Calendar',
     'Calendar Name': 'Calendar Name',
     'Description (optional)': 'Description (optional)',
     Color: 'Color',
+    'Custom color': 'Custom color',
     'Calendar description': 'Calendar description',
     'My Calendar': 'My Calendar',
     'Creating...': 'Creating...',
@@ -62,7 +116,8 @@ export const translations = {
 
     // Recurrence
     'Edit Recurring Event': 'Edit Recurring Event',
-    'This is a recurring event. What would you like to edit?': 'This is a recurring event. What would you like to edit?',
+    'This is a recurring event. What would you like to edit?':
+      'This is a recurring event. What would you like to edit?',
     'This event only': 'This event only',
     'All events in series': 'All events in series',
     'this occurrence': 'this occurrence',
@@ -73,6 +128,13 @@ export const translations = {
     'week(s)': 'week(s)',
     'month(s)': 'month(s)',
     'year(s)': 'year(s)',
+    'On the same day of month': 'On the same day of month',
+    'On a specific weekday': 'On a specific weekday',
+    First: 'First',
+    Second: 'Second',
+    Third: 'Third',
+    Fourth: 'Fourth',
+    Last: 'Last',
     Mon: 'Mon',
     Tue: 'Tue',
     Wed: 'Wed',
@@ -89,6 +151,70 @@ export const translations = {
     'Export .ics': 'Export .ics',
     'Download this occurrence as .ics': 'Download this occurrence as .ics',
     'Download as .ics': 'Download as .ics',
+
+    // Agenda & Year Views
+    'No events found in this period': 'No events found in this period',
+    'All day': 'All day',
+    'events': 'events',
+
+    // Free / Busy Dialog
+    'Free / Busy Availability': 'Free / Busy Availability',
+    Date: 'Date',
+    'Select calendars': 'Select calendars',
+    'Check Availability': 'Check Availability',
+    'Checking...': 'Checking...',
+    'No busy periods': 'No busy periods',
+    'Busy (Tentative)': 'Busy (Tentative)',
+    Unavailable: 'Unavailable',
+
+    // Tasks (VTODO)
+    'Add a new task...': 'Add a new task...',
+    'New Task': 'New Task',
+    'Edit Task': 'Edit Task',
+    'Due Date': 'Due Date',
+    Priority: 'Priority',
+    None: 'None',
+    High: 'High',
+    Medium: 'Medium',
+    Low: 'Low',
+    Progress: 'Progress',
+    All: 'All',
+    Open: 'Open',
+    Completed: 'Completed',
+    Overdue: 'Overdue',
+    'In Progress': 'In Progress',
+    'Needs Action': 'Needs Action',
+    'No tasks found': 'No tasks found',
+    'Search tasks...': 'Search tasks...',
+    Add: 'Add',
+
+    // Notes / Journals (VJOURNAL)
+    'New Note': 'New Note',
+    'Edit Note': 'Edit Note',
+    'Note title': 'Note title',
+    'Write your note...': 'Write your note...',
+    'Search notes...': 'Search notes...',
+    'No notes yet': 'No notes yet',
+    Draft: 'Draft',
+    Final: 'Final',
+
+    // Contacts (CardDAV)
+    'New Contact': 'New Contact',
+    'Edit Contact': 'Edit Contact',
+    'Search contacts...': 'Search contacts...',
+    'No contacts found': 'No contacts found',
+    'No address books available': 'No address books available',
+    'Full Name': 'Full Name',
+    'First Name': 'First Name',
+    'Last Name': 'Last Name',
+    Email: 'Email',
+    Phone: 'Phone',
+    Organization: 'Organization',
+    'Job Title': 'Job Title',
+    Birthday: 'Birthday',
+    'Add email': 'Add email',
+    'Add phone': 'Add phone',
+    'Address Book': 'Address Book',
 
     // ICS Import
     'Import Calendar': 'Import Calendar',
@@ -137,13 +263,23 @@ export const translations = {
     'No public links created yet': 'No public links created yet',
     'Revoke link': 'Revoke link',
     'Shared via link': 'Shared via link',
+    'Shared by:': 'Shared by:',
+    Accepted: 'Accepted',
+    Invited: 'Invited',
+    Left: 'Left',
+    'Remove share': 'Remove share',
     'Join Shared Calendar': 'Join Shared Calendar',
-    'You have been invited to join the calendar "%{name}".': 'You have been invited to join the calendar "%{name}".',
+    'You have been invited to join the calendar "%{name}".':
+      'You have been invited to join the calendar "%{name}".',
     'Permission: %{perm}': 'Permission: %{perm}',
     'Join Calendar': 'Join Calendar',
     'You are already subscribed to this calendar.': 'You are already subscribed to this calendar.',
     'Joined calendar successfully': 'Joined calendar successfully',
     'Leave calendar': 'Leave calendar',
+    'Leave Calendar': 'Leave Calendar',
+    Leave: 'Leave',
+    "Are you sure you want to leave '%{name}'? You will no longer have access to this calendar.":
+      "Are you sure you want to leave '%{name}'? You will no longer have access to this calendar.",
 
     // Confirm Dialog
     Confirm: 'Confirm',
@@ -151,31 +287,58 @@ export const translations = {
     // Delete Calendar Confirmation
     'Delete Calendar': 'Delete Calendar',
     "Are you sure you want to delete '%{name}'? All events in this calendar will be permanently deleted.":
-      "Are you sure you want to delete '%{name}'? All events in this calendar will be permanently deleted."
+      "Are you sure you want to delete '%{name}'? All events in this calendar will be permanently deleted.",
+    'Calendar exported successfully': 'Calendar exported successfully',
+    'Failed to export calendar': 'Failed to export calendar',
+    'Reminder: %{title}': 'Reminder: %{title}'
   },
   de: {
     // App
     'Web Calendar': 'Web-Kalender',
 
-    // Navigation
+    // Navigation & Sections
     Today: 'Heute',
     Month: 'Monat',
     Week: 'Woche',
     Day: 'Tag',
+    Agenda: 'Agenda',
+    Year: 'Jahr',
+    Calendar: 'Kalender',
+    Tasks: 'Aufgaben',
+    Notes: 'Notizen',
+    Contacts: 'Kontakte',
+    'Toggle sidebar': 'Seitenleiste umschalten',
+    'Search events...': 'Termine durchsuchen...',
+    'All categories': 'Alle Kategorien',
+    'Clear search': 'Suche leeren',
+    'Free / Busy': 'Frei / Gebucht',
+    'Enable notifications': 'Benachrichtigungen aktivieren',
+    'Notifications enabled': 'Benachrichtigungen aktiviert',
+    'Notifications disabled': 'Benachrichtigungen deaktiviert',
+    'Keyboard shortcuts': 'Tastenkürzel',
 
     // Sidebar
     Calendars: 'Kalender',
     'Create new calendar': 'Neuen Kalender erstellen',
+    'Edit calendar': 'Kalender bearbeiten',
+    'Export calendar (.ics)': 'Kalender exportieren (.ics)',
     'Loading calendars...': 'Kalender werden geladen...',
     'No calendars found': 'Keine Kalender gefunden',
     'Delete calendar': 'Kalender löschen',
     'Share calendar': 'Kalender teilen',
+    'Pending Invitations': 'Ausstehende Einladungen',
+    'From:': 'Von:',
+    Accept: 'Annehmen',
+    Decline: 'Ablehnen',
+    Refresh: 'Aktualisieren',
+    Overlays: 'Einblendungen',
+    'Show tasks with due dates': 'Aufgaben mit Fälligkeitsdatum anzeigen',
+    'Show contact birthdays': 'Kontakt-Geburtstage anzeigen',
 
     // Event Dialog
     'Edit Event': 'Termin bearbeiten',
     'New Event': 'Neuer Termin',
     Title: 'Titel',
-    Calendar: 'Kalender',
     'All day event': 'Ganztägig',
     'Start Date': 'Startdatum',
     'Start Time': 'Startzeit',
@@ -190,6 +353,38 @@ export const translations = {
     Cancel: 'Abbrechen',
     'Saving...': 'Speichern...',
     Save: 'Speichern',
+    'This calendar is read-only. You cannot make changes.':
+      'Dieser Kalender ist schreibgeschützt. Sie können keine Änderungen vornehmen.',
+    'Meeting URL / Link': 'Meeting-URL / Link',
+    'https://...': 'https://...',
+    'Open link': 'Link öffnen',
+    Categories: 'Kategorien',
+    'Add tag and press Enter': 'Schlagwort eingeben und Enter drücken',
+    Status: 'Status',
+    Confirmed: 'Bestätigt',
+    Tentative: 'Vorläufig',
+    Cancelled: 'Abgesagt',
+    Availability: 'Verfügbarkeit',
+    Busy: 'Beschäftigt',
+    Free: 'Frei',
+    Visibility: 'Sichtbarkeit',
+    Public: 'Öffentlich',
+    Private: 'Privat',
+    Confidential: 'Vertraulich',
+    Timezone: 'Zeitzone',
+    'Local time (UTC)': 'Lokale Zeit (UTC)',
+    Reminders: 'Erinnerungen',
+    'Add reminder': 'Erinnerung hinzufügen',
+    'At time of event': 'Zum Terminbeginn',
+    '5 minutes before': '5 Minuten vorher',
+    '15 minutes before': '15 Minuten vorher',
+    '30 minutes before': '30 Minuten vorher',
+    '1 hour before': '1 Stunde vorher',
+    '2 hours before': '2 Stunden vorher',
+    '1 day before': '1 Tag vorher',
+    '1 week before': '1 Woche vorher',
+    'More options': 'Weitere Optionen',
+    'Fewer options': 'Weniger Optionen',
 
     // Conflict Resolution
     'This event was modified by another client. Choose how to resolve:':
@@ -199,9 +394,11 @@ export const translations = {
 
     // Calendar Dialog
     'New Calendar': 'Neuer Kalender',
+    'Edit Calendar': 'Kalender bearbeiten',
     'Calendar Name': 'Kalendername',
     'Description (optional)': 'Beschreibung (optional)',
     Color: 'Farbe',
+    'Custom color': 'Eigene Farbe',
     'Calendar description': 'Kalenderbeschreibung',
     'My Calendar': 'Mein Kalender',
     'Creating...': 'Erstellen...',
@@ -209,7 +406,8 @@ export const translations = {
 
     // Recurrence
     'Edit Recurring Event': 'Wiederkehrenden Termin bearbeiten',
-    'This is a recurring event. What would you like to edit?': 'Dies ist ein wiederkehrender Termin. Was möchten Sie bearbeiten?',
+    'This is a recurring event. What would you like to edit?':
+      'Dies ist ein wiederkehrender Termin. Was möchten Sie bearbeiten?',
     'This event only': 'Nur diesen Termin',
     'All events in series': 'Alle Termine der Serie',
     'this occurrence': 'dieses Vorkommen',
@@ -220,6 +418,13 @@ export const translations = {
     'week(s)': 'Woche(n)',
     'month(s)': 'Monat(e)',
     'year(s)': 'Jahr(e)',
+    'On the same day of month': 'Am selben Tag des Monats',
+    'On a specific weekday': 'An einem bestimmten Wochentag',
+    First: 'Ersten',
+    Second: 'Zweiten',
+    Third: 'Dritten',
+    Fourth: 'Vierten',
+    Last: 'Letzten',
     Mon: 'Mo',
     Tue: 'Di',
     Wed: 'Mi',
@@ -236,6 +441,70 @@ export const translations = {
     'Export .ics': 'Als .ics herunterladen',
     'Download this occurrence as .ics': 'Dieses Vorkommen als .ics herunterladen',
     'Download as .ics': 'Als .ics herunterladen',
+
+    // Agenda & Year Views
+    'No events found in this period': 'Keine Termine in diesem Zeitraum gefunden',
+    'All day': 'Ganztägig',
+    events: 'Termine',
+
+    // Free / Busy Dialog
+    'Free / Busy Availability': 'Frei / Gebucht-Übersicht',
+    Date: 'Datum',
+    'Select calendars': 'Kalender auswählen',
+    'Check Availability': 'Verfügbarkeit prüfen',
+    'Checking...': 'Prüfe...',
+    'No busy periods': 'Keine belegten Zeiträume',
+    'Busy (Tentative)': 'Gebucht (Vorläufig)',
+    Unavailable: 'Nicht verfügbar',
+
+    // Tasks (VTODO)
+    'Add a new task...': 'Neue Aufgabe hinzufügen...',
+    'New Task': 'Neue Aufgabe',
+    'Edit Task': 'Aufgabe bearbeiten',
+    'Due Date': 'Fällig am',
+    Priority: 'Priorität',
+    None: 'Keine',
+    High: 'Hoch',
+    Medium: 'Mittel',
+    Low: 'Niedrig',
+    Progress: 'Fortschritt',
+    All: 'Alle',
+    Open: 'Offen',
+    Completed: 'Erledigt',
+    Overdue: 'Überfällig',
+    'In Progress': 'In Bearbeitung',
+    'Needs Action': 'Offen',
+    'No tasks found': 'Keine Aufgaben gefunden',
+    'Search tasks...': 'Aufgaben durchsuchen...',
+    Add: 'Hinzufügen',
+
+    // Notes / Journals (VJOURNAL)
+    'New Note': 'Neue Notiz',
+    'Edit Note': 'Notiz bearbeiten',
+    'Note title': 'Notiztitel',
+    'Write your note...': 'Notiz schreiben...',
+    'Search notes...': 'Notizen durchsuchen...',
+    'No notes yet': 'Noch keine Notizen vorhanden',
+    Draft: 'Entwurf',
+    Final: 'Fertig',
+
+    // Contacts (CardDAV)
+    'New Contact': 'Neuer Kontakt',
+    'Edit Contact': 'Kontakt bearbeiten',
+    'Search contacts...': 'Kontakte durchsuchen...',
+    'No contacts found': 'Keine Kontakte gefunden',
+    'No address books available': 'Keine Adressbücher verfügbar',
+    'Full Name': 'Vollständiger Name',
+    'First Name': 'Vorname',
+    'Last Name': 'Nachname',
+    Email: 'E-Mail',
+    Phone: 'Telefon',
+    Organization: 'Organisation',
+    'Job Title': 'Position',
+    Birthday: 'Geburtstag',
+    'Add email': 'E-Mail hinzufügen',
+    'Add phone': 'Telefon hinzufügen',
+    'Address Book': 'Adressbuch',
 
     // ICS Import
     'Import Calendar': 'Kalender importieren',
@@ -284,14 +553,23 @@ export const translations = {
     'No public links created yet': 'Noch keine Links erstellt',
     'Revoke link': 'Link widerrufen',
     'Shared via link': 'Über Link geteilt',
+    'Shared by:': 'Geteilt von:',
+    Accepted: 'Angenommen',
+    Invited: 'Eingeladen',
+    Left: 'Verlassen',
+    'Remove share': 'Freigabe entfernen',
     'Join Shared Calendar': 'Geteiltem Kalender beitreten',
-    'You have been invited to join the calendar "%{name}".': 'Sie wurden eingeladen, dem Kalender „%{name}" beizutreten.',
+    'You have been invited to join the calendar "%{name}".':
+      'Sie wurden eingeladen, dem Kalender „%{name}" beizutreten.',
     'Permission: %{perm}': 'Berechtigung: %{perm}',
     'Join Calendar': 'Kalender beitreten',
     'You are already subscribed to this calendar.': 'Sie haben diesen Kalender bereits abonniert.',
     'Joined calendar successfully': 'Kalender erfolgreich beigetreten',
     'Leave calendar': 'Kalender verlassen',
-    'This calendar is read-only. You cannot make changes.': 'Dieser Kalender ist schreibgeschützt. Sie können keine Änderungen vornehmen.',
+    'Leave Calendar': 'Kalender verlassen',
+    Leave: 'Verlassen',
+    "Are you sure you want to leave '%{name}'? You will no longer have access to this calendar.":
+      "Möchten Sie '%{name}' wirklich verlassen? Sie haben danach keinen Zugriff mehr auf diesen Kalender.",
 
     // Confirm Dialog
     Confirm: 'Bestätigen',
@@ -299,7 +577,10 @@ export const translations = {
     // Delete Calendar Confirmation
     'Delete Calendar': 'Kalender löschen',
     "Are you sure you want to delete '%{name}'? All events in this calendar will be permanently deleted.":
-      "Möchten Sie '%{name}' wirklich löschen? Alle Termine in diesem Kalender werden unwiderruflich gelöscht."
+      "Möchten Sie '%{name}' wirklich löschen? Alle Termine in diesem Kalender werden unwiderruflich gelöscht.",
+    'Calendar exported successfully': 'Kalender erfolgreich exportiert',
+    'Failed to export calendar': 'Kalender konnte nicht exportiert werden',
+    'Reminder: %{title}': 'Erinnerung: %{title}'
   }
 }
 

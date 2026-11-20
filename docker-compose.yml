@@ -89,6 +89,30 @@ services:
       - ./dev/docker/radicale/config:/etc/radicale/config
       - ${RADICALE_DATA_DIR:-radicale-data}:/var/lib/radicale
 
+  builder:
+    image: node:22-alpine
+    working_dir: /app
+    volumes:
+      - ./:/app
+    environment:
+      - CI=true
+      - COREPACK_HOME=/tmp/corepack
+    command: sh -c "corepack enable && pnpm install && pnpm build"
+    profiles:
+      - tools
+
+  builder-watch:
+    image: node:22-alpine
+    working_dir: /app
+    volumes:
+      - ./:/app
+    environment:
+      - CI=true
+      - COREPACK_HOME=/tmp/corepack
+    command: sh -c "corepack enable && pnpm install && pnpm build:w"
+    profiles:
+      - tools
+
 volumes:
   opencloud-config:
   radicale-data:
